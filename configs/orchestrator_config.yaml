@@ -1,0 +1,83 @@
+# Master Orchestrator Configuration
+# Defines how agents are managed, scheduled, and coordinated
+
+orchestrator_id: "financial_orchestrator_001"
+name: "Financial Quant Orchestrator"
+version: "1.0.0"
+description: "Orchestrates financial workflows using specialized agents"
+
+# Agent registry - defines available agents and their configurations
+agent_registry:
+  data_engineer:
+    config_file: "../agents/data_engineer_config.yaml"
+    instances: 
+      - instance_id: "data_engineer_001"
+        status: "ready"
+  ai_engineer:
+    config_file: "../agents/ai_engineer_config.yaml"
+    instances:
+      - instance_id: "ai_engineer_001"
+        status: "ready"
+  finance_tracker:
+    config_file: "../agents/finance_tracker_config.yaml"
+    instances:
+      - instance_id: "finance_tracker_001"
+        status: "ready"
+  api_tester:
+    config_file: "../agents/api_tester_config.yaml"
+    instances:
+      - instance_id: "api_tester_001"
+        status: "ready"
+
+# Workflow definitions
+workflows:
+  quant_research:
+    template_file: "../memory/workflow_templates/quant_research_workflow.yaml"
+    trigger_conditions:
+      - cron: "0 6 * * 1-5"  # Every weekday at 6 AM
+      - manual: true
+      - data_update: true
+    max_concurrent_executions: 2
+    priority: "high"
+
+# Resource allocation
+resource_limits:
+  max_concurrent_workflows: 5
+  max_agents_per_workflow: 10
+  cpu_limit_per_agent: "500m"
+  memory_limit_per_agent: "1Gi"
+
+# Scheduling policies
+scheduling:
+  algorithm: "priority_based"  # priority_based, round_robin, weighted_fair
+  preemption_enabled: true
+  task_timeout_default: "30 minutes"
+
+# Communication protocols
+communication:
+  message_queue: "redis"  # or rabbitmq, kafka, etc.
+  update_interval: "10 seconds"
+  heartbeat_interval: "30 seconds"
+
+# Monitoring and logging
+monitoring:
+  metrics_enabled: true
+  logging_level: "info"
+  trace_enabled: true
+  metrics_endpoint: ":9090"
+  health_check_endpoint: "/health"
+
+# Security and access control
+security:
+  authentication_required: true
+  authorization_enabled: true
+  audit_logging: true
+  encryption_in_transit: true
+  encryption_at_rest: true
+
+# Failover and redundancy
+failover:
+  enabled: true
+  backup_orchestrators: 2
+  health_check_interval: "15 seconds"
+  failover_timeout: "30 seconds"

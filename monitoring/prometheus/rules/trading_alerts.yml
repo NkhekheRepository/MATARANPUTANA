@@ -1,0 +1,90 @@
+groups:
+  - name: trading_alerts
+    interval: 30s
+    rules:
+      # Win Rate Alerts
+      - alert: LowWinRate
+        expr: trading_win_rate < 40
+        for: 5m
+        labels:
+          severity: critical
+          component: trading
+        annotations:
+          summary: "Win rate below critical threshold"
+          description: "Win rate is {{ $value }}%, below 40% threshold"
+
+      - alert: WarningWinRate
+        expr: trading_win_rate < 45
+        for: 10m
+        labels:
+          severity: warning
+          component: trading
+        annotations:
+          summary: "Win rate below warning threshold"
+          description: "Win rate is {{ $value }}%, below 45% threshold"
+
+      # Drawdown Alerts
+      - alert: HighDrawdown
+        expr: trading_max_drawdown > 1500
+        for: 5m
+        labels:
+          severity: critical
+          component: risk
+        annotations:
+          summary: "High drawdown detected"
+          description: "Max drawdown is ${{ $value }}"
+
+      # Daily P&L Alerts
+      - alert: LargeDailyLoss
+        expr: trading_daily_pnl < -100
+        for: 3m
+        labels:
+          severity: warning
+          component: risk
+        annotations:
+          summary: "Large daily loss"
+          description: "Daily P&L is ${{ $value }}"
+
+      # Circuit Breaker Alerts
+      - alert: CircuitBreakerOpen
+        expr: trading_circuit_breaker_state == 1
+        for: 1m
+        labels:
+          severity: critical
+          component: safety
+        annotations:
+          summary: "Circuit breaker triggered"
+          description: "Trading circuit breaker is OPEN"
+
+      # Position Alerts
+      - alert: TooManyPositions
+        expr: trading_active_positions > 3
+        for: 2m
+        labels:
+          severity: warning
+          component: risk
+        annotations:
+          summary: "Too many open positions"
+          description: "{{ $value }} positions open"
+
+      # Capital Alerts
+      - alert: LowCapital
+        expr: trading_capital < 5000
+        for: 5m
+        labels:
+          severity: critical
+          component: risk
+        annotations:
+          summary: "Low capital"
+          description: "Capital is ${{ $value }}, below $5000"
+
+      # Order Failure Alerts
+      - alert: HighOrderFailureRate
+        expr: (trading_order_count_total / time()) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: execution
+        annotations:
+          summary: "High order failure rate"
+          description: "Order failure rate is elevated"

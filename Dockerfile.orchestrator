@@ -1,0 +1,60 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY paper_trading/ ./paper_trading/
+COPY vnpy_engine/ ./vnpy_engine/
+COPY agents/ ./agents/
+COPY monitoring/ ./monitoring/
+COPY optimization/ ./optimization/
+COPY validation/ ./validation/
+COPY data_lab/ ./data_lab/
+COPY configs/ ./configs/
+COPY memory/ ./memory/
+COPY logs/ ./logs/
+COPY deployment/ ./deployment/
+COPY docs/ ./docs/
+COPY workflows/ ./workflows/
+COPY telegram_watchtower/ ./telegram_watchtower/
+COPY autonomous_trading.py .
+COPY run_paper_trading.py .
+COPY run_live_trading.py .
+COPY start_system.sh .
+COPY stop_system.sh .
+COPY health_check.py .
+COPY integration_test.py .
+COPY e2e_test.py .
+COPY stress_test.py .
+COPY fix_tests.py .
+COPY test_order.py .
+COPY README.md .
+COPY LICENSE .
+COPY AUTONOMOUS_TRADING.md .
+COPY setup.sh .
+COPY setup_agents.sh .
+COPY setup_telegram_bot.sh .
+
+# Create non-root user
+RUN adduser --disabled-password --gecos '' appuser
+RUN chown -R appuser:appuser /app
+USER appuser
+
+# Expose orchestrator port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Start the orchestrator
+CMD ["python", "run_paper_trading.py"]

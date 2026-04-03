@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Quantitative Model Output Schema",
+  "description": "Schema for validated quantitative model outputs",
+  "type": "object",
+  "required": ["model_id", "prediction_timestamp", "predictions", "confidence_scores"],
+  "properties": {
+    "model_id": {
+      "type": "string",
+      "description": "Unique identifier for the model"
+    },
+    "prediction_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when predictions were generated"
+    },
+    "predictions": {
+      "type": "array",
+      "description": "Array of predictions",
+      "items": {
+        "type": "object",
+        "required": ["asset", "predicted_return", "confidence"],
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "Asset symbol (e.g., AAPL)"
+          },
+          "predicted_return": {
+            "type": "number",
+            "description": "Predicted return (can be negative)"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Confidence score for the prediction"
+          },
+          "horizon": {
+            "type": "string",
+            "enum": ["1d", "5d", "1mo", "3mo"],
+            "description": "Prediction horizon"
+          }
+        }
+      }
+    },
+    "confidence_scores": {
+      "type": "object",
+      "description": "Overall model confidence metrics",
+      "properties": {
+        "overall_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "directional_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "information_ratio": {
+          "type": "number"
+        }
+      },
+      "required": ["overall_confidence"]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional model metadata",
+      "properties": {
+        "training_period_start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "training_period_end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "feature_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "model_version": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

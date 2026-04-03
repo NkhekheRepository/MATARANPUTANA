@@ -1,0 +1,116 @@
+# Data Lab Configuration
+# Phase 1: Data ingestion, storage, and feature extraction
+
+data_lab:
+  version: "1.0.0"
+  name: "Quant Data Lab"
+  enabled: true
+  
+  # Memory limits per module (MB)
+  memory_limits:
+    data_ingestion: 500
+    feature_lab: 1024
+    redis_buffer: 500
+    monitoring: 200
+    total_max: 6650
+
+  # Redis configuration
+  redis:
+    host: "localhost"
+    port: 6379
+    db: 0
+    max_connections: 50
+    socket_timeout: 5
+    socket_connect_timeout: 5
+    
+  # Stream configuration
+  streams:
+    market_data:
+      name: "market_data"
+      max_length: 10000
+      block_timeout_ms: 1000
+      consumer_group: "data_lab"
+      
+    system_alerts:
+      name: "system_alerts"
+      max_length: 5000
+      block_timeout_ms: 500
+      consumer_group: "monitoring"
+      
+    feature_output:
+      name: "feature_output"
+      max_length: 5000
+      block_timeout_ms: 1000
+      consumer_group: "feature_lab"
+
+  # Backpressure configuration
+  backpressure:
+    enabled: true
+    warning_threshold: 0.8  # 80% of max
+    critical_threshold: 0.95  # 95% of max
+    drop_policy: "low_priority_first"
+    alert_on_overflow: true
+
+  # Exchange configuration
+  exchanges:
+    binance:
+      enabled: true
+      ws_endpoint: "wss://stream.binance.com:9443/ws"
+      rest_endpoint: "https://api.binance.com/api/v3"
+      rate_limit:
+        weight_per_minute: 1200
+        orders_per_second: 10
+        orders_per_minute: 120
+      symbols:
+        - "btcusdt"
+        - "ethusdt"
+        - "bnbusdt"
+      intervals:
+        ticker: "1s"
+        kline: "1m"
+        depth: "100ms"
+
+  # Data validation
+  validation:
+    tick_latency_threshold_ms: 500
+    orderbook_refresh_threshold_ms: 1000
+    reject_duplicates: true
+    fill_missing_data: true
+    interpolate_gaps: true
+
+  # Storage configuration
+  storage:
+    backend: "duckdb"
+    database_path: "data_lab/market_data.duckdb"
+    tick_retention_days: 30
+    kline_retention_days: 365
+    compression: true
+
+  # Feature extraction
+  features:
+    enabled: true
+    technical_indicators:
+      - "sma"
+      - "ema"
+      - "rsi"
+      - "macd"
+      - "bbands"
+    microstructure:
+      - "spread"
+      - "depth_imbalance"
+      - "trade_intensity"
+
+  # Monitoring
+  monitoring:
+    enabled: true
+    metrics_interval_seconds: 10
+    cpu_threshold_percent: 70
+    ram_threshold_mb: 6650
+    latency_threshold_ms: 500
+
+  # Telegram reporting
+  telegram:
+    enabled: true
+    chat_id: 7361240735
+    status_interval_minutes: 5
+    alert_immediate: true

@@ -1,0 +1,407 @@
+"""
+Integration tests for RL-enhanced CTA strategies.
+"""
+
+import sys
+import site
+from pathlib import Path
+import tempfile
+
+vnpy_site_packages = site.getsitepackages()[0]
+sys.path.insert(0, vnpy_site_packages)
+
+proj_root = str(Path(__file__).parent.parent)
+sys.path.insert(0, proj_root)
+sys.path.insert(0, str(Path(__file__).parent))
+
+import pytest
+import numpy as np
+from unittest.mock import Mock, patch, MagicMock
+
+from vnpy.trader.object import BarData
+from vnpy.trader.constant import Interval, Exchange, Direction
+from datetime import datetime, timedelta
+
+from conftest import SyntheticDataGenerator, MockCtaEngine
+
+
+@pytest.fixture
+def mock_rl_agent():
+    """Create a mock RL agent for testing."""
+    agent = Mock()
+    agent.get_action.return_value = {
+        "action": "hold",
+        "action_idx": 0,
+        "evaluation": {
+            "expected_pnl": 0,
+            "risk_metrics": {
+                "var_95": -0.02,
+                "cvar_95": -0.05,
+                "sharpe_ratio": 0.5
+            }
+        }
+    }
+    agent.get_action_with_risk.return_value = {
+        "action": "hold",
+        "action_idx": 0,
+        "evaluation": {"expected_pnl": 0, "risk_metrics": {}},
+        "market_state": {},
+        "timestamp": 0
+    }
+    return agent
+
+
+@pytest.fixture
+def mock_cta_engine():
+    return MockCtaEngine()
+
+
+class TestRlEnhancedCTAIntegration:
+    """Integration tests for RlEnhancedCtaStrategy."""
+    
+    @patch('vnpy_local.rl_module.get_rl_agent', create=True)
+    def test_rl_agent_loads(self, mock_get_rl, mock_cta_engine, mock_rl_agent):
+        """Test RL agent is loaded on strategy initialization."""
+        mock_get_rl.return_value = mock_rl_agent
+        
+        from vnpy_local.strategies.cta_strategies import RlEnhancedCtaStrategy
+        
+        strategy = RlEnhancedCtaStrategy(
+            cta_engine=mock_cta_engine,
+            strategy_name="TestRL",
+            vt_symbol="BTCUSDT.BINANCE",
+            setting={
+                "fast_window": 10,
+                "slow_window": 30,
+                "fixed_size": 1,
+                "rl_enabled": True
+            }
+        )
+        
+        assert strategy.rl_agent is not None
+        mock_get_rl.assert_called_once()
+    
+    @patch('vnpy_local.rl_module.get_rl_agent', create=True)
+    def test_cta_signal_validated_by_rl(self, mock_get_rl, mock_cta_engine, mock_rl_agent):
+        """Test CTA signals are validated by RL agent."""
+        mock_get_rl.return_value = mock_rl_agent
+        
+        from vnpy_local.strategies.cta_strategies import RlEnhancedCtaStrategy
+        
+        strategy = RlEnhancedCtaStrategy(
+            cta_engine=mock_cta_engine,
+            strategy_name="TestRL",
+            vt_symbol="BTCUSDT.BINANCE",
+            setting={
+                "fast_window": 5,
+                "slow_window": 15,
+                "fixed_size": 1,
+                "rl_enabled": True
+            }
+        )
+        
+        strategy.on_init()
+        
+        gen = SyntheticDataGenerator(initial_price=50000)
+        bars = gen.generate_trending_bars(n=200, trend="up")
+        
+        for bar in bars:
+            strategy.on_bar(bar)
+        
+        assert mock_rl_agent.get_action_with_risk.call_count > 0
+    
+    @patch('vnpy_local.rl_module.get_rl_agent', create=True)
+    def test_rl_filter_approves_valid_signals(self, mock_get_rl, mock_cta_engine, mock_rl_agent):
+        """Test RL approves valid CTA signals."""
+        mock_get_rl.return_value = mock_rl_agent
+        mock_rl_agent.get_action_with_risk.return_value = {
+            "action": "buy",
+            "action_idx": 1,
+            "evaluation": {"expected_pnl": 100, "risk_metrics": {"var_95": -0.01}},
+            "market_state": {},
+            "timestamp": 0
+        }
+        
+        from vnpy_local.strategies.cta_strategies import RlEnhancedCtaStrategy
+        
+        strategy = RlEnhancedCtaStrategy(
+            cta_engine=mock_cta_engine,
+            strategy_name="TestRL",
+            vt_symbol="BTCUSDT.BINANCE",
+            setting={
+                "fast_window": 5,
+                "slow_window": 15,
+                "fixed_size": 1,
+                "rl_enabled": True
+            }
+        )
+        
+        gen = SyntheticDataGenerator(initial_price=50000)
+        bars = gen.generate_trending_bars(n=200, trend="up")
+        
+        for bar in bars:
+            strategy.on_bar(bar)
+        
+        assert strategy.rl_approved is True
+    
+    @patch('vnpy_local.rl_module.get_rl_agent', create=True)
+    def test_rl_filter_rejects_invalid_signals(self, mock_get_rl, mock_cta_engine, mock_rl_agent):
+        """Test RL rejects invalid CTA signals."""
+        mock_get_rl.return_value = mock_rl_agent
+        mock_rl_agent.get_action_with_risk.return_value = {
+            "action": "hold",
+            "action_idx": 0,
+            "evaluation": {"expected_pnl": -50, "risk_metrics": {"var_95": -0.1}},
+            "market_state": {},
+            "timestamp": 0
+        }
+        
+        from vnpy_local.strategies.cta_strategies import RlEnhancedCtaStrategy
+        
+        strategy = RlEnhancedCtaStrategy(
+            cta_engine=mock_cta_engine,
+        strategy.on_init()
+        strategy.on_start()
+            strategy_name="TestRL",
+            vt_symbol="BTCUSDT.BINANCE",
+            setting={
+                "fast_window": 5,
+                "slow_window": 15,
+                "fixed_size": 1,
+                "rl_enabled": True
+            }
+        )
+        
+        gen = SyntheticDataGenerator(initial_price=50000)
+        bars = gen.generate_trending_bars(n=200, trend="up")
+        
+        initial_orders = len(strategy.cta_engine.trades)
+        
+        for bar in bars:
+            strategy.on_bar(bar)
+        
+        assert strategy.rl_approved is False
+    
+    @patch('vnpy_local.rl_module.get_rl_agent', create=True)
+    def test_fallback_when_rl_disabled(self, mock_get_rl, mock_cta_engine, mock_rl_agent):
+        """Test strategy works when RL is disabled."""
+        mock_get_rl.return_value = mock_rl_agent
+        
+        from vnpy_local.strategies.cta_strategies import RlEnhancedCtaStrategy
+        
+        strategy = RlEnhancedCtaStrategy(
+            cta_engine=mock_cta_engine,
+            strategy_name="TestRL",
+            vt_symbol="BTCUSDT.BINANCE",
+            setting={
+                "fast_window": 5,
+                "slow_window": 15,
+                "fixed_size": 1,
+                "rl_enabled": True
+            }
+        )
+        
+        strategy.on_init()
+        strategy.on_start()
+        strategy.rl_enabled = False
+        
+        gen = SyntheticDataGenerator(initial_price=50000)
+        bars = gen.generate_trending_bars(n=200, trend="up")
+        
+        for bar in bars:
+            strategy.on_bar(bar)
+        
+        assert len(strategy.cta_engine.trades) > 0
+    
+    @patch('vnpy_local.rl_module.get_rl_agent', create=True)
+    def test_fallback_on_rl_error(self, mock_get_rl, mock_cta_engine):
+        """Test strategy falls back when RL agent errors."""
+        mock_get_rl.side_effect = Exception("RL agent error")
+        
+        from vnpy_local.strategies.cta_strategies import RlEnhancedCtaStrategy
+        
+        strategy = RlEnhancedCtaStrategy(
+            cta_engine=mock_cta_engine,
+            strategy_name="TestRL",
+            vt_symbol="BTCUSDT.BINANCE",
+            setting={
+                "fast_window": 5,
+                "slow_window": 15,
+                "fixed_size": 1,
+                "rl_enabled": True
+            }
+        )
+        
+        gen = SyntheticDataGenerator(initial_price=50000)
+        bars = gen.generate_trending_bars(n=200, trend="up")
+        
+        for bar in bars:
+            strategy.on_bar(bar)
+        
+        assert strategy.rl_enabled is False
+
+
+class TestRLCTAPerformance:
+    """Performance comparison tests for RL-enhanced CTA."""
+    
+    @patch('vnpy_local.rl_module.get_rl_agent', create=True)
+    def test_rl_reduces_whipsaws(self, mock_get_rl, mock_cta_engine):
+        """Test RL filter reduces false signals in ranging market."""
+        mock_rl_agent = Mock()
+        mock_get_rl.return_value = mock_rl_agent
+        
+        call_count = 0
+        def mock_get_action(state):
+            nonlocal call_count
+            call_count += 1
+            return {"action": "hold", "action_idx": 0}
+        
+        mock_rl_agent.get_action_with_risk.side_effect = mock_get_action
+        
+        from vnpy_local.strategies.cta_strategies import RlEnhancedCtaStrategy, MomentumCtaStrategy
+        
+        rl_strategy = RlEnhancedCtaStrategy(
+            cta_engine=mock_cta_engine,
+            strategy_name="TestRL",
+            vt_symbol="BTCUSDT.BINANCE",
+            setting={"fast_window": 5, "slow_window": 15, "fixed_size": 1}
+        )
+        
+        cta_strategy = MomentumCtaStrategy(
+            cta_engine=MockCtaEngine(),
+            strategy_name="TestCTA",
+            vt_symbol="BTCUSDT.BINANCE",
+            setting={"fast_window": 5, "slow_window": 15, "fixed_size": 1}
+        )
+        
+        gen = SyntheticDataGenerator(initial_price=50000)
+        bars = gen.generate_ranging_bars(n=100, width=0.01)
+        
+        for bar in bars:
+            rl_strategy.on_bar(bar)
+            cta_strategy.on_bar(bar)
+        
+        rl_trades = len(rl_strategy.cta_engine.trades)
+        cta_trades = len(cta_strategy.cta_engine.trades)
+        
+        assert rl_trades <= cta_trades
+    
+    @patch('vnpy_local.rl_module.get_rl_agent', create=True)
+    def test_rl_preserves_trend_following(self, mock_get_rl, mock_cta_engine):
+        """Test RL doesn't filter out good trend signals."""
+        mock_rl_agent = Mock()
+        mock_get_rl.return_value = mock_rl_agent
+        
+        def mock_get_action(state):
+            return {"action": "buy", "action_idx": 1}
+        
+        mock_rl_agent.get_action_with_risk.side_effect = mock_get_action
+        
+        from vnpy_local.strategies.cta_strategies import RlEnhancedCtaStrategy
+        
+        strategy = RlEnhancedCtaStrategy(
+            cta_engine=mock_cta_engine,
+            strategy_name="TestRL",
+            vt_symbol="BTCUSDT.BINANCE",
+            setting={"fast_window": 5, "slow_window": 15, "fixed_size": 1}
+        )
+        
+        strategy.on_init()
+        strategy.on_start()
+        
+        gen = SyntheticDataGenerator(initial_price=50000)
+        bars = gen.generate_trending_bars(n=200, trend="up")
+        
+        for bar in bars:
+            strategy.on_bar(bar)
+        
+        buys = [o for o in strategy.cta_engine.trades if o.direction == Direction.LONG]
+        assert len(buys) > 0
+
+
+class TestEndToEnd:
+    """End-to-end integration tests."""
+    
+    @patch('vnpy_local.rl_module.get_rl_agent', create=True)
+    def test_full_trading_cycle(self, mock_get_rl, mock_cta_engine):
+        """Test complete trading cycle: init -> trade -> close."""
+        mock_rl_agent = Mock()
+        mock_get_rl.return_value = mock_rl_agent
+        
+        approval = [True, False, True]
+        approval_idx = [0]
+        
+        def mock_get_action(state):
+            idx = approval_idx[0]
+            approval_idx[0] += 1
+            if idx < len(approval):
+                action = "buy" if approval[idx] else "hold"
+            else:
+                action = "sell"
+            return {"action": action, "action_idx": 1 if action == "buy" else 0}
+        
+        mock_rl_agent.get_action_with_risk.side_effect = mock_get_action
+        
+        from vnpy_local.strategies.cta_strategies import RlEnhancedCtaStrategy
+        
+        strategy = RlEnhancedCtaStrategy(
+            cta_engine=mock_cta_engine,
+            strategy_name="TestCycle",
+            vt_symbol="BTCUSDT.BINANCE",
+            setting={"fast_window": 5, "slow_window": 15, "fixed_size": 1}
+        )
+        
+        strategy.on_init()
+        
+        gen = SyntheticDataGenerator(initial_price=50000)
+        bars = gen.generate_trending_bars(n=200, trend="up")
+        
+        for bar in bars:
+            strategy.on_bar(bar)
+        
+        assert strategy.inited is True
+        assert len(strategy.cta_engine.trades) > 0
+    
+    def test_multiple_strategies_compare(self):
+        """Test comparing multiple strategy types on same data."""
+        from vnpy_local.strategies.cta_strategies import (
+            MomentumCtaStrategy,
+            MeanReversionCtaStrategy,
+            BreakoutCtaStrategy,
+        )
+        
+        engine1 = MockCtaEngine()
+        engine2 = MockCtaEngine()
+        engine3 = MockCtaEngine()
+        
+        momentum = MomentumCtaStrategy(
+            engine1, "Momentum", "BTCUSDT.BINANCE",
+            {"fast_window": 5, "slow_window": 15, "fixed_size": 1}
+        )
+        
+        mean_reversion = MeanReversionCtaStrategy(
+            engine2, "MeanRev", "BTCUSDT.BINANCE",
+            {"boll_window": 10, "boll_dev": 2.0, "fixed_size": 1}
+        )
+        
+        breakout = BreakoutCtaStrategy(
+            engine3, "Breakout", "BTCUSDT.BINANCE",
+            {"lookback_window": 10, "fixed_size": 1}
+        )
+        
+        gen = SyntheticDataGenerator(initial_price=50000)
+        bars = gen.generate_trending_bars(n=200, trend="up")
+        
+        for bar in bars:
+            momentum.on_bar(bar)
+            mean_reversion.on_bar(bar)
+            breakout.on_bar(bar)
+        
+        results = {
+            "momentum": len(engine1.trades),
+            "mean_reversion": len(engine2.trades),
+            "breakout": len(engine3.trades)
+        }
+        
+        assert all(count >= 0 for count in results.values())
+        assert sum(results.values()) > 0

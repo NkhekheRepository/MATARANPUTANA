@@ -1,0 +1,175 @@
+# Quant Research Workflow Template
+# Based on Qlib ML pipeline and financial research best practices
+
+workflow_id: ""
+workflow_name: "Quantitative Research Workflow"
+description: "End-to-end workflow for developing and deploying quantitative models"
+phases:
+  - name: "Data Acquisition"
+    description: "Collect and ingest financial market data"
+    tasks:
+      - id: "data_acq_001"
+        name: "Market Data Ingestion"
+        description: "Ingest price, volume, and fundamental data from OpenBB"
+        agent_type: "Data Engineer"
+        estimated_duration: "30 minutes"
+        dependencies: []
+        deliverables: ["Raw market data in standardized format"]
+        validation_rules: ["data_completeness", "timestamp_consistency", "price_volume_validity"]
+      - id: "data_acq_002"
+        name: "Alternative Data Integration"
+        description: "Ingest alternative data (news, sentiment, macroeconomic)"
+        agent_type: "Data Engineer"
+        estimated_duration: "45 minutes"
+        dependencies: ["data_acq_001"]
+        deliverables: ["Integrated alternative dataset"]
+        validation_rules: ["data_relevance", "temporal_alignment"]
+    estimated_total_duration: "75 minutes"
+  - name: "Feature Engineering"
+    description: "Create predictive features from raw and alternative data"
+    tasks:
+      - id: "feat_eng_001"
+        name: "Technical Indicator Calculation"
+        description: "Calculate technical indicators (moving averages, RSI, MACD, etc.)"
+        agent_type: "Data Engineer"
+        estimated_duration: "60 minutes"
+        dependencies: ["data_acq_001"]
+        deliverables: ["Technical indicator features"]
+        validation_rules: ["mathematical_correctness", "no_lookahead_bias"]
+      - id: "feat_eng_002"
+        name: "Fundamental Feature Extraction"
+        description: "Extract features from financial statements and ratios"
+        agent_type: "Data Engineer"
+        estimated_duration: "90 minutes"
+        dependencies: ["data_acq_001"]
+        deliverables: ["Fundamental features"]
+        validation_rules: ["accounting_principles", "consistency"]
+      - id: "feat_eng_003"
+        name: "Alternative Data Feature Engineering"
+        description: "Process alternative data into model-ready features"
+        agent_type: "Data Engineer"
+        estimated_duration: "60 minutes"
+        dependencies: ["data_acq_002"]
+        deliverables: ["Alternative data features"]
+        validation_rules: ["signal_validity", "noise_reduction"]
+    estimated_total_duration: "210 minutes"
+  - name: "Model Development"
+    description: "Develop and train quantitative models"
+    tasks:
+      - id: "model_dev_001"
+        name: "Feature Selection and Engineering"
+        description: "Select optimal features and create interaction terms"
+        agent_type: "AI Engineer"
+        estimated_duration: "120 minutes"
+        dependencies: ["feat_eng_001", "feat_eng_002", "feat_eng_003"]
+        deliverables: ["Feature set for modeling"]
+        validation_rules: ["feature_importance", "multicollinearity_check"]
+      - id: "model_dev_002"
+        name: "Model Selection and Training"
+        description: "Train multiple model architectures (linear, tree-based, neural)"
+        agent_type: "AI Engineer"
+        estimated_duration: "240 minutes"
+        dependencies: ["model_dev_001"]
+        deliverables: ["Trained model candidates"]
+        validation_rules: ["training_convergence", "overfitting_check"]
+      - id: "model_dev_003"
+        name: "Hyperparameter Optimization"
+        description: "Optimize model hyperparameters using Bayesian optimization"
+        agent_type: "AI Engineer"
+        estimated_duration: "180 minutes"
+        dependencies: ["model_dev_002"]
+        deliverables: ["Optimized model"]
+        validation_rules: ["optimization_convergence", "parameter_stability"]
+    estimated_total_duration: "540 minutes"
+  - name: "Validation and Backtesting"
+    description: "Validate model performance and conduct backtesting"
+    tasks:
+      - id: "validation_001"
+        name: "In-Sample Validation"
+        description: "Validate model performance on training period"
+        agent_type: "Finance Tracker"
+        estimated_duration: "90 minutes"
+        dependencies: ["model_dev_003"]
+        deliverables: ["In-sample performance metrics"]
+        validation_rules: ["statistical_significance", "economic_plausibility"]
+      - id: "validation_002"
+        name: "Out-of-Sample Testing"
+        description: "Test model on unseen data"
+        agent_type: "Finance Tracker"
+        estimated_duration: "120 minutes"
+        dependencies: ["validation_001"]
+        deliverables: ["Out-of-sample performance metrics"]
+        validation_rules: ["temporal_stability", "regime_robustness"]
+      - id: "validation_003"
+        name: "Walk-Forward Analysis"
+        description: "Conduct walk-forward validation to simulate live trading"
+        agent_type: "Finance Tracker"
+        estimated_duration: "180 minutes"
+        dependencies: ["validation_002"]
+        deliverables: ["Walk-forward performance report"]
+        validation_rules: ["walk_forward_consistency", "transaction_cost_impact"]
+      - id: "validation_004"
+        name: "Risk Analysis"
+        description: "Analyze model risk metrics (drawdown, volatility, tail risk)"
+        agent_type: "Finance Tracker"
+        estimated_duration: "90 minutes"
+        dependencies: ["validation_003"]
+        deliverables: ["Risk analysis report"]
+        validation_rules: ["risk_metric_reasonableness", "stress_test_survival"]
+    estimated_total_duration: "480 minutes"
+  - name: "Deployment Preparation"
+    description: "Prepare model for production deployment"
+    tasks:
+      - id: "deployment_001"
+        name: "Model Serialization and Packaging"
+        description: "Package model for deployment with version control"
+        agent_type: "AI Engineer"
+        estimated_duration: "60 minutes"
+        dependencies: ["validation_004"]
+        deliverables: ["Deployable model artifact"]
+        validation_rules: ["model_integrity", "dependency_specification"]
+      - id: "deployment_002"
+        name: "API Endpoint Development"
+        description: "Create API endpoint for model inference"
+        agent_type: "API Tester"
+        estimated_duration: "120 minutes"
+        dependencies: ["deployment_001"]
+        deliverables: ["Model inference API"]
+        validation_rules: ["api_functionality", "response_time_benchmark"]
+      - id: "deployment_003"
+        name: "Deployment Documentation"
+        description: "Document deployment procedures and monitoring setup"
+        agent_type: "Project Manager"
+        estimated_duration: "90 minutes"
+        dependencies: ["deployment_002"]
+        deliverables: ["Deployment runbook"]
+        validation_rules: ["documentation_completeness", "clarity"]
+    estimated_total_duration: "270 minutes"
+estimated_total_duration: "1575 minutes"  # 26.25 hours
+success_criteria: [
+  "Information ratio > 0.5",
+  "Maximum drawdown < 20%",
+  "Win rate > 55%",
+  "Profit factor > 1.5",
+  "Model stability across market regimes"
+]
+failure_conditions: [
+  "Information ratio < 0.2",
+  "Maximum drawdown > 40%",
+  "Model fails to outperform benchmark",
+  "Critical data pipeline failures"
+]
+risk_factors: [
+  "Overfitting to historical data",
+  "Regime changes not captured in training data",
+  "Data snooping bias",
+  "Transaction cost underestimation",
+  "Liquidity constraints"
+]
+mitigation_strategies: [
+  "Use walk-forward validation and out-of-sample testing",
+  "Incorporate regime detection features",
+  "Apply strict statistical significance thresholds",
+  "Use realistic transaction cost models",
+  "Incorporate liquidity-adjusted position sizing"
+]

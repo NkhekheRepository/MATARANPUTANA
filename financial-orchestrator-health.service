@@ -1,0 +1,11 @@
+[Unit]
+Description=Financial Orchestrator Health Check
+After=network.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/financial_orchestrator
+ExecStart=/home/ubuntu/financial_orchestrator/venv/bin/python3 /home/ubuntu/financial_orchestrator/health_check.py
+StandardOutput=journal
+StandardError=journal

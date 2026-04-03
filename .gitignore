@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs and temporary files
+logs/
+*.log
+*.tmp
+*.bak
+
+# Memory and state files (optional - comment out if you want to persist)
+# memory/execution_history/
+# memory/optimization_knowledge/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Credentials (NEVER commit these)
+*.pem
+*.key
+*.credentials
+.env
+
+# VN.PY
+vnpy_repo/
+
+# VN.PY Engine
+vnpy_engine/memory/
+vnpy_engine/logs/
+vnpy_engine/models/
+!vnpy_engine/config/
+!vnpy_engine/prometheus.yml

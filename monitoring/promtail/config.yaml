@@ -1,0 +1,69 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: vnpy_engine_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: vnpy_engine
+          service: vnpy_engine
+          __path__: /logs/vnpy_*.log
+
+  - job_name: orchestrator_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: orchestrator
+          service: orchestrator
+          __path__: /logs/orchestrator_*.log
+
+  - job_name: paper_trading_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: paper_trading
+          service: paper_trading
+          __path__: /logs/paper_trading*.log
+
+  - job_name: system_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          service: system
+          __path__: /logs/*.log
+    pipeline_stages:
+      - docker:
+      - regex:
+          expression: '.*level=(?P<level>(?i:error|warn|info|debug|trace))'
+      - labels:
+          level:
+
+  - job_name: application_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: application
+          service: application
+          __path__: /logs/**/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="application"}'
+          stages:
+            - regex:
+                expression: '.*level=(?P<level>(?i:error|warn|info|debug|trace))'
+            - labels:
+                level:

@@ -1,0 +1,103 @@
+# Telegram Watch Tower Configuration
+# Real-time monitoring bot for Financial Orchestrator
+
+telegram:
+  enabled: true
+  bot_token: "8604194684:AAFbX0YsS4bfiedWyRtZQmBF6sDkcfiV5B0"
+  allowed_chat_ids:
+    - 7361240735
+  admin_chat_ids:
+    - 7361240735
+  
+watchtower:
+  name: "Financial Orchestrator Watch Tower"
+  version: "1.0.0"
+  
+  # Event monitoring scope
+  events:
+    system_health: true
+    workflow_events: true
+    agent_events: true
+    risk_alerts: true
+    security_events: true
+    
+  # Polling configuration
+  polling:
+    interval_seconds: 2
+    long_polling_timeout: 5
+    
+  # Log monitoring
+  log_files:
+    - path: "/home/ubuntu/financial_orchestrator/logs/risk_monitor.log"
+      name: "Risk Monitor"
+      event_patterns:
+        - "ALERT"
+        - "WARNING"
+        - "CRITICAL"
+        - "ERROR"
+    - path: "/home/ubuntu/financial_orchestrator/logs/workflow_nohup.log"
+      name: "Workflow"
+      event_patterns:
+        - "ERROR"
+        - "FAILED"
+        - "completed"
+        - "started"
+    - path: "/home/ubuntu/financial_orchestrator/logs/optimizer_nohup.log"
+      name: "Optimizer"
+      event_patterns:
+        - "ERROR"
+        - "Optimization"
+        
+  # Resource monitoring
+  resource_limits:
+    memory_threshold_percent: 85
+    cpu_threshold_percent: 90
+    disk_threshold_percent: 90
+    
+  # Notification settings
+  notifications:
+    risk_alerts: true
+    workflow_status: true
+    system_health: true
+    agent_events: true
+    health_reports: true
+    
+  # Health check settings
+  health_check:
+    enabled: true
+    interval_seconds: 3600
+    
+  # Commands
+  commands:
+    - name: "/status"
+      description: "Get system status"
+      aliases: ["/s"]
+    - name: "/workflows"
+      description: "List active workflows"
+      aliases: ["/wf"]
+    - name: "/agents"
+      description: "List agent statuses"
+      aliases: ["/ag"]
+    - name: "/logs"
+      description: "Get recent logs"
+      aliases: ["/log"]
+    - name: "/metrics"
+      description: "Show system metrics"
+      aliases: ["/m"]
+    - name: "/alerts"
+      description: "Show recent alerts"
+      aliases: ["/a"]
+    - name: "/help"
+      description: "Show help message"
+      aliases: ["/h", "/?"]
+
+  # Memory optimization
+  memory:
+    max_log_buffer_mb: 10
+    cleanup_interval_seconds: 300
+    
+  # Reliability
+  reliability:
+    max_reconnect_attempts: 5
+    reconnect_delay_seconds: 10
+    health_check_interval_seconds: 60

@@ -1,0 +1,98 @@
+# Security Configuration
+# JWT, rate limiting, and access control
+
+security:
+  version: "1.0.0"
+  
+  # JWT Authentication
+  jwt:
+    enabled: true
+    secret_key_env: "JWT_SECRET_KEY"
+    algorithm: "HS256"
+    access_token_expire_minutes: 60
+    refresh_token_expire_days: 7
+    issuer: "quant_lab"
+    audience: "data_lab_api"
+    
+  # API Rate Limiting
+  rate_limiting:
+    enabled: true
+    default_limits:
+      requests_per_minute: 60
+      requests_per_hour: 1000
+      burst_size: 10
+      
+    endpoints:
+      "/api/v1/tick":
+        requests_per_minute: 300
+        requests_per_hour: 10000
+        
+      "/api/v1/orderbook":
+        requests_per_minute: 300
+        requests_per_hour: 10000
+        
+      "/api/v1/features":
+        requests_per_minute: 60
+        requests_per_hour: 1000
+        
+      "/api/v1/admin":
+        requests_per_minute: 10
+        requests_per_hour: 100
+
+  # IP Allowlist
+  ip_whitelist:
+    enabled: false
+    allowed_ips:
+      - "127.0.0.1"
+      - "::1"
+      # Add trusted IPs here
+      
+  # API Keys for exchanges (read-only)
+  exchange_keys:
+    binance:
+      api_key_env: "BINANCE_API_KEY"
+      secret_env: "BINANCE_SECRET_KEY"
+      read_only: true  # Phase 1 is read-only
+      
+  # Principle of least privilege
+  privilege_model:
+    service_accounts:
+      data_ingestion:
+        permissions:
+          - "read:market_data"
+          - "write:internal_queue"
+          
+      feature_lab:
+        permissions:
+          - "read:market_data"
+          - "read:features"
+          - "write:feature_output"
+          
+      monitoring:
+        permissions:
+          - "read:metrics"
+          - "write:alerts"
+          
+      api_server:
+        permissions:
+          - "read:market_data"
+          - "read:features"
+          - "read:alerts"
+
+  # Encryption
+  encryption:
+    at_rest: false  # Use OS-level encryption
+    in_transit: true
+    tls_version: "1.2"
+    
+  # Audit logging
+  audit:
+    enabled: true
+    log_path: "logs/audit.log"
+    log_level: "INFO"
+    events:
+      - "authentication"
+      - "authorization_failure"
+      - "rate_limit_exceeded"
+      - "data_access"
+      - "configuration_change"

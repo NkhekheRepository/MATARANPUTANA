@@ -1,0 +1,133 @@
+# Validation Rules for Financial Workflows
+# Defines rules for validating outputs at different stages of the workflow
+
+validation_enabled: true
+validation_level: "strict"  # basic, standard, strict, paranoid
+
+# Schema validation rules
+schema_validation:
+  market_data:
+    enabled: true
+    schema_file: "../schemas/market_data_schema.json"
+    required_for: ["data_acq_001", "data_acq_002"]
+    error_threshold: 0.01  # Max 1% of records can fail validation
+  
+  model_output:
+    enabled: true
+    schema_file: "../schemas/model_output_schema.json"
+    required_for: ["model_dev_002", "model_dev_003", "validation_001", "validation_002"]
+    error_threshold: 0.0  # No errors allowed for model outputs
+
+# Data quality rules
+data_quality:
+  completeness:
+    enabled: true
+    min_completeness: 0.95  # 95% of expected data points must be present
+    checks:
+      - "missing_values_check"
+      - "expected_count_check"
+  
+  consistency:
+    enabled: true
+    max_inconsistency: 0.02  # Max 2% inconsistency allowed
+    checks:
+      - "price_logic_check"  # high >= low, close between open and close
+      - "timestamp_order_check"
+      - "volume_non_negative"
+  
+  validity:
+    enabled: true
+    checks:
+      - "extreme_value_check"  # No prices > 10x median or < 0.1x median
+      - "return_reasonableness"  # Daily returns > -50% and < +100% flagged
+      - "volume_spike_detection"  # Volume > 10x average flagged for review
+
+# Model validation rules
+model_validation:
+  statistical_significance:
+    enabled: true
+    min_p_value: 0.05  # Predictions must be statistically significant
+    metrics: ["information_ratio", "sharpe_ratio", "t_stat"]
+  
+  economic_plausibility:
+    enabled: true
+    checks:
+      - "return_magnitude"  # Returns should be in reasonable range
+      - "risk_reward_ratio"  # Should align with risk taken
+      - "factor_exposure_limits"  # No excessive factor exposures
+  
+  overfitting_checks:
+    enabled: true
+    metrics:
+      - "in_vs_out_sample_performance_ratio"  # Should be > 0.5
+      - "cross_validation_stability"
+      - "parameter_stability"
+  
+  stability_checks:
+    enabled: true
+    checks:
+      - "prediction_stability_over_time"
+      - "feature_importance_stability"
+      - "regime_robustness"
+
+# Business logic rules
+business_logic:
+  position_limits:
+    enabled: true
+    max_position_size: 0.1  # Max 10% of portfolio in any single position
+    max_sector_exposure: 0.3  # Max 30% in any sector
+  
+  risk_limits:
+    enabled: true
+    max_daily_var: 0.05  # Max 5% daily Value at Risk
+    max_drawdown: 0.2  # Max 20% drawdown
+    max_leverage: 2.0  # Max 2x leverage
+  
+  turnover_limits:
+    enabled: true
+    max_annual_turnover: 4.0  # Max 400% annual turnover
+    max_daily_turnover: 0.5  # Max 50% daily turnover
+
+# Alerting rules
+alerting:
+  validation_failures:
+    enabled: true
+    threshold: 3  # Alert after 3 consecutive validation failures
+    escalation:
+      - level: "agent"
+        action: "log_and_notify"
+        timeout: "5 minutes"
+      - level: "supervisor"
+        action: "pause_workflow"
+        timeout: "15 minutes"
+      - level: "management"
+        action: "require_manual_approval"
+        timeout: "1 hour"
+  
+  performance_degradation:
+    enabled: true
+    metrics:
+      - "declining_sharpe_ratio"
+      - "increasing_drawdown"
+      - "reducing_information_ratio"
+    thresholds:
+      - metric: "sharpe_ratio"
+        threshold: 0.5
+        direction: "declining"
+        window: "7 days"
+      - metric: "max_drawdown"
+        threshold: 0.15
+        direction: "increasing"
+        window: "7 days"
+
+# Reporting rules
+reporting:
+  generate_reports: true
+  report_frequency: "hourly"  # How often to generate validation reports
+  report_format: ["json", "html"]  # Formats for reports
+  include:
+    - "validation_summary"
+    - "failed_validations"
+    - "trends"
+    - "recommendations"
+  retention_days: 30  # Keep validation reports for 30 days

@@ -1,0 +1,236 @@
+# Paper Trading Configuration
+# Autonomous Quant Trading System
+
+trading:
+  # Initial capital in USD
+  initial_capital: 10000
+  
+  # Leverage factor (1 = no leverage, 5 = 5x)
+  leverage: 5
+  
+  # Trading pairs
+  symbols: 
+    - BTCUSDT
+    - ETHUSDT
+    - SOLUSDT
+    - BNBUSDT
+  
+  # Update interval in seconds
+  update_interval: 5
+  
+  # Trading mode: paper | testnet | live
+  mode: testnet
+  
+  # Enable/disable trading
+  enabled: true
+
+risk:
+  # Maximum daily loss as percentage
+  max_daily_loss_pct: 15
+  
+  # Maximum drawdown as percentage
+  max_drawdown_pct: 20
+  
+  # Position size as percentage of capital
+  position_size_pct: 10
+  
+  # Stop loss as percentage (widened to handle mock volatility)
+  stop_loss_pct: 3.0
+  
+  # Take profit as percentage (more conservative)
+  take_profit_pct: 3.0
+
+  # Black Swan Resistant Execution Layer - Phase 1
+  black_swan:
+    # Feature 1: CVaR-based Tail Risk
+    cvar_limit_pct: 5.0  # Max CVaR as % of capital per trade
+    
+    # Feature 5: Regime Collapse Detection  
+    defensive_vol_threshold: 3.0  # Volatility spike threshold (σ)
+    
+    # Feature 8: Capital Drawdown Defense
+    dd_scale_5_pct: 0.25   # Reduce size 25% when DD > 5%
+    dd_scale_10_pct: 0.50  # Reduce size 50% when DD > 10%
+    dd_scale_15_pct: 0.00  # Halt trading when DD > 15%
+    
+    # Feature 10: Fail-Safe Mode
+    consecutive_loss_limit: 3  # Trigger fail-safe after N consecutive losses
+    
+    # Black Swan Resistant Execution Layer - Phase 2
+    # Feature 2: Model Uncertainty Penalty
+    uncertainty_beta: 0.3  # β penalty factor
+    uncertainty_threshold: 0.1  # Reject if disagreement > this
+    
+    # Feature 3: Edge Decay
+    edge_decay_lambda: 0.1  # Decay rate
+    edge_threshold: 0.01  # Reject if edge < this
+    
+    # Feature 12: Execution Conservatism
+    max_uncertainty: 0.1  # Max uncertainty allowed
+    min_confidence: 0.7  # Min confidence required
+    
+    # Feature 7: Risk of Ruin
+    ruin_threshold: 0.01  # Halt if P(ruin) > this
+    min_capital_threshold: 1000  # Critical capital level
+    
+    # Black Swan Resistant Execution Layer - Phase 3
+    # Feature 6: Correlation Shock
+    correlation_threshold: 0.7  # Reduce exposure if avg correlation > this
+    high_corr_threshold: 0.8  # Flag high correlation pairs
+    
+    # Feature 9: Liquidity & Market Stress
+    spread_threshold: 0.005  # 0.5% max spread
+    volume_spike_threshold: 5.0  # Reject if volume > 5x normal
+    order_book_depth_threshold: 0.1  # Min 10% depth
+    
+    # Feature 4: Slippage Feedback
+    slippage_error_tolerance: 0.002  # 0.2% tolerance
+    slippage_penalty_factor: 1.5  # Multiplier for conservative estimates
+    
+    # Feature 11: Meta-Learning Stability
+    volatility_gate: 0.03  # 3% volatility threshold
+    performance_degradation_threshold: -0.05  # 5% loss threshold
+    degradation_periods: 3  # Freeze after N periods of degradation
+
+strategies:
+  - name: "RL_Enhanced"
+    class: "RlEnhancedCtaStrategy"
+    vt_symbol: "BTCUSDT.BINANCE"
+    enabled: true
+    parameters:
+      fast_window: 10
+      slow_window: 30
+      fixed_size: 1
+      rl_enabled: true
+  
+  - name: "Momentum"
+    class: "MomentumCtaStrategy"
+    vt_symbol: "BTCUSDT.BINANCE"
+    enabled: false
+    parameters:
+      fast_window: 10
+      slow_window: 30
+      fixed_size: 1
+  
+  - name: "MeanReversion"
+    class: "MeanReversionCtaStrategy"
+    vt_symbol: "BTCUSDT.BINANCE"
+    enabled: true
+    parameters:
+      boll_window: 20
+      boll_dev: 2.0
+      fixed_size: 1
+  
+  - name: "Breakout"
+    class: "BreakoutCtaStrategy"
+    vt_symbol: "BTCUSDT.BINANCE"
+    enabled: false
+    parameters:
+      lookback_window: 20
+      fixed_size: 1
+
+data:
+  # Binance WebSocket endpoint
+  ws_endpoint: "wss://stream.binance.com:9443/ws"
+  
+  # Binance REST API endpoint
+  rest_endpoint: "https://api.binance.com/api/v3"
+  
+  # Reconnection settings
+  reconnect_interval: 5
+  max_reconnect_attempts: 10
+  
+  # Data buffer size
+  buffer_size: 100
+
+intelligence:
+  # HMM Regime Detection
+  hmm:
+    enabled: true
+    n_states: 4
+    lookback_bars: 100
+  
+  # Markov Decision Tree
+  decision_tree:
+    enabled: true
+    max_depth: 5
+  
+  # Self-Learning
+  self_learning:
+    enabled: true
+    retrain_interval: 60  # seconds
+    min_samples: 50  # Increased from 20 for better model quality
+  
+  # Adaptive Learning
+  adaptive:
+    enabled: true
+    regime_strategy_map:
+      bull: "MomentumCtaStrategy"
+      bear: "MeanReversionCtaStrategy"
+      volatile: "BreakoutCtaStrategy"
+      sideways: "RlEnhancedCtaStrategy"
+
+orchestration:
+  # Health monitoring
+  health_check_interval: 60
+  
+  # Auto-restart on failure
+  auto_restart: true
+  restart_delay: 10
+  
+  # Config hot-reload
+  config_reload: true
+  config_watch_interval: 30
+  
+  # Integrated healing
+  integrated_healing:
+    enabled: true
+    max_restarts: 3
+  
+  # Healing effectiveness tracking
+  healing_effectiveness:
+    enabled: true
+    max_history: 1000
+    min_samples: 5
+    success_threshold: 70.0
+
+# Performance goals
+goals:
+  enabled: true
+  sharpe_target: 1.5
+  sharpe_warning: 1.0
+  sharpe_critical: 0.5
+  drawdown_target: -5.0
+  drawdown_warning: -10.0
+  drawdown_critical: -20.0
+  daily_return_target: 1.0
+  daily_return_warning: 0.5
+  daily_return_critical: 0.0
+  win_rate_target: 55.0
+  win_rate_warning: 50.0
+  win_rate_critical: 45.0
+  model_accuracy_target: 60.0
+  model_accuracy_warning: 55.0
+  model_accuracy_critical: 50.0
+  calmar_target: 2.0
+  calmar_warning: 1.0
+  calmar_critical: 0.5
+
+# Meta-learning configuration
+meta_learning:
+  enabled: true
+  param_history_length: 100
+
+telegram:
+  enabled: true
+  admin_chat_id: 7361240735
+  alerts:
+    - trade_executed
+    - position_closed
+    - risk_alert
+    - system_error
+
+dashboard:
+  host: "0.0.0.0"
+  port: 8080
+  refresh_interval: 1

@@ -1,0 +1,483 @@
+"""
+CTA Strategy Module
+===================
+CTA Strategy implementations following VN.PY CtaTemplate pattern.
+Includes Momentum, Mean Reversion, Breakout, and RL-enhanced strategies.
+"""
+
+from vnpy.trader.constant import Interval, Direction, Offset
+from vnpy.trader.object import BarData, TickData, TradeData, OrderData
+from vnpy.trader.utility import ArrayManager
+
+from vnpy_ctastrategy.template import CtaTemplate, CtaSignal
+from vnpy_ctastrategy.base import StopOrder
+
+
+class MomentumCtaStrategy(CtaTemplate):
+    """
+    Momentum Strategy using SMA crossover.
+    - Buy when fast SMA crosses above slow SMA
+    - Sell when fast SMA crosses below slow SMA
+    """
+    author = "Financial Orchestrator"
+
+    fast_window = 10
+    slow_window = 30
+    fixed_size = 1
+
+    parameters = ["fast_window", "slow_window", "fixed_size"]
+    variables = ["inited", "trading", "pos", "fast_ma", "slow_ma"]
+
+    def __init__(self, cta_engine, strategy_name, vt_symbol, setting):
+        super().__init__(cta_engine, strategy_name, vt_symbol, setting)
+
+        self.am = ArrayManager(100)
+
+        self.fast_ma = 0.0
+        self.slow_ma = 0.0
+
+        self.last_bar = None
+
+    def on_init(self) -> None:
+        self.write_log("MomentumCtaStrategy initializing")
+        self.load_bar(10, Interval.MINUTE, self.on_bar)
+        self.inited = True
+        self.put_event()
+
+    def on_start(self) -> None:
+        self.write_log("MomentumCtaStrategy started")
+        self.put_event()
+
+    def on_stop(self) -> None:
+        self.write_log("MomentumCtaStrategy stopped")
+        self.cancel_all()
+        self.put_event()
+
+    def on_tick(self, tick: TickData) -> None:
+        return
+
+    def on_bar(self, bar: BarData) -> None:
+        self.am.update_bar(bar)
+
+        if not self.am.inited:
+            return
+
+        self.fast_ma = self.am.sma(self.fast_window)
+        self.slow_ma = self.am.sma(self.slow_window)
+
+        if not self.last_bar:
+            self.last_bar = bar
+            return
+
+        cross_over = (
+            self.last_bar.close_price < self.slow_ma and
+            bar.close_price > self.slow_ma and
+            self.fast_ma > self.slow_ma
+        )
+
+        cross_under = (
+            self.last_bar.close_price > self.slow_ma and
+            bar.close_price < self.slow_ma and
+            self.fast_ma < self.slow_ma
+        )
+
+        # Handle bullish crossover
+        if cross_over:
+            if self.pos == 0:
+                self.buy(bar.close_price, self.fixed_size)
+            elif self.pos < 0:
+                self.cover(bar.close_price, abs(self.pos))
+        
+        # Handle bearish crossover
+        elif cross_under:
+            if self.pos == 0:
+                self.short(bar.close_price, self.fixed_size)
+            elif self.pos > 0:
+                self.sell(bar.close_price, abs(self.pos))
+        
+        # Trend-following fallback when no crossover
+        else:
+            if self.pos == 0:
+                if self.fast_ma > self.slow_ma:
+                    self.buy(bar.close_price, self.fixed_size)
+                elif self.fast_ma < self.slow_ma:
+                    self.short(bar.close_price, self.fixed_size)
+            elif self.pos > 0 and self.fast_ma < self.slow_ma:
+                self.sell(bar.close_price, abs(self.pos))
+            elif self.pos < 0 and self.fast_ma > self.slow_ma:
+                self.cover(bar.close_price, abs(self.pos))
+
+        self.last_bar = bar
+        self.sync_data()
+        self.put_event()
+
+    def on_trade(self, trade: TradeData) -> None:
+        self.write_log(f"Trade executed: {trade.direction} {trade.volume}@{trade.price}")
+        self.put_event()
+
+    def on_order(self, order: OrderData) -> None:
+        self.put_event()
+
+    def on_stop_order(self, stop_order: StopOrder) -> None:
+        return
+
+
+class MeanReversionCtaStrategy(CtaTemplate):
+    """
+    Mean Reversion Strategy using Bollinger Bands.
+    - Buy when price touches lower band
+    - Sell when price touches upper band
+    """
+    author = "Financial Orchestrator"
+
+    boll_window = 20
+    boll_dev = 2.0
+    fixed_size = 1
+
+    parameters = ["boll_window", "boll_dev", "fixed_size"]
+    variables = ["inited", "trading", "pos", "boll_mid", "boll_upper", "boll_lower"]
+
+    def __init__(self, cta_engine, strategy_name, vt_symbol, setting):
+        super().__init__(cta_engine, strategy_name, vt_symbol, setting)
+
+        self.am = ArrayManager(100)
+
+        self.boll_mid = 0.0
+        self.boll_upper = 0.0
+        self.boll_lower = 0.0
+
+        self.last_bar = None
+
+    def on_init(self) -> None:
+        self.write_log("MeanReversionCtaStrategy initializing")
+        self.load_bar(10, Interval.MINUTE, self.on_bar)
+        self.inited = True
+        self.put_event()
+
+    def on_start(self) -> None:
+        self.write_log("MeanReversionCtaStrategy started")
+        self.put_event()
+
+    def on_stop(self) -> None:
+        self.write_log("MeanReversionCtaStrategy stopped")
+        self.cancel_all()
+        self.put_event()
+
+    def on_tick(self, tick: TickData) -> None:
+        return
+
+    def on_bar(self, bar: BarData) -> None:
+        self.am.update_bar(bar)
+
+        if not self.am.inited:
+            return
+
+        self.boll_mid = self.am.sma(self.boll_window)
+        self.boll_upper, self.boll_lower = self.am.boll(
+            self.boll_window, self.boll_dev
+        )
+
+        if not self.last_bar:
+            self.last_bar = bar
+            return
+
+        if self.pos == 0:
+            if bar.close_price < self.boll_lower:
+                self.buy(bar.close_price, self.fixed_size)
+
+        elif self.pos > 0:
+            if bar.close_price > self.boll_upper:
+                self.sell(bar.close_price, abs(self.pos))
+            elif bar.close_price > self.boll_mid:
+                self.sell(bar.close_price, abs(self.pos) // 2)
+
+        self.last_bar = bar
+        self.sync_data()
+        self.put_event()
+
+    def on_trade(self, trade: TradeData) -> None:
+        self.write_log(f"Trade executed: {trade.direction} {trade.volume}@{trade.price}")
+        self.put_event()
+
+    def on_order(self, order: OrderData) -> None:
+        self.put_event()
+
+    def on_stop_order(self, stop_order: StopOrder) -> None:
+        return
+
+
+class BreakoutCtaStrategy(CtaTemplate):
+    """
+    Channel Breakout Strategy.
+    - Buy when price breaks above highest high of lookback period
+    - Sell when price breaks below lowest low of lookback period
+    """
+    author = "Financial Orchestrator"
+
+    lookback_window = 20
+    fixed_size = 1
+
+    parameters = ["lookback_window", "fixed_size"]
+    variables = ["inited", "trading", "pos", "highest", "lowest"]
+
+    def __init__(self, cta_engine, strategy_name, vt_symbol, setting):
+        super().__init__(cta_engine, strategy_name, vt_symbol, setting)
+
+        self.am = ArrayManager(100)
+
+        self.highest = 0.0
+        self.lowest = 0.0
+
+        self.last_bar = None
+
+    def on_init(self) -> None:
+        self.write_log("BreakoutCtaStrategy initializing")
+        self.load_bar(10, Interval.MINUTE, self.on_bar)
+        self.inited = True
+        self.put_event()
+
+    def on_start(self) -> None:
+        self.write_log("BreakoutCtaStrategy started")
+        self.put_event()
+
+    def on_stop(self) -> None:
+        self.write_log("BreakoutCtaStrategy stopped")
+        self.cancel_all()
+        self.put_event()
+
+    def on_tick(self, tick: TickData) -> None:
+        return
+
+    def on_bar(self, bar: BarData) -> None:
+        self.am.update_bar(bar)
+
+        if not self.am.inited or self.am.count < self.lookback_window + 1:
+            self.last_bar = bar
+            return
+
+        # Highest and lowest of previous lookback_window bars (excluding current)
+        self.highest = self.am.high[-self.lookback_window-1:-1].max()
+        self.lowest = self.am.low[-self.lookback_window-1:-1].min()
+
+        if not self.last_bar:
+            self.last_bar = bar
+            return
+
+        if self.pos == 0:
+            if bar.close_price > self.highest:
+                self.buy(bar.close_price, self.fixed_size)
+            elif bar.close_price < self.lowest:
+                self.short(bar.close_price, self.fixed_size)
+        elif self.pos > 0:
+            if bar.close_price < self.lowest:
+                self.sell(bar.close_price, abs(self.pos))
+        elif self.pos < 0:
+            if bar.close_price > self.highest:
+                self.cover(bar.close_price, abs(self.pos))
+
+        self.last_bar = bar
+        self.sync_data()
+        self.put_event()
+
+    def on_trade(self, trade: TradeData) -> None:
+        self.write_log(f"Trade executed: {trade.direction} {trade.volume}@{trade.price}")
+        self.put_event()
+
+    def on_order(self, order: OrderData) -> None:
+        self.put_event()
+
+    def on_stop_order(self, stop_order: StopOrder) -> None:
+        return
+
+
+class RlEnhancedCtaStrategy(CtaTemplate):
+    """
+    CTA Strategy enhanced with RL signal filtering.
+    Uses traditional CTA indicators but validates signals through RL agent.
+    """
+    author = "Financial Orchestrator"
+
+    fast_window = 10
+    slow_window = 30
+    fixed_size = 1
+    rl_enabled = True
+
+    parameters = ["fast_window", "slow_window", "fixed_size", "rl_enabled"]
+    variables = ["inited", "trading", "pos", "fast_ma", "slow_ma", "rl_approved"]
+
+    def __init__(self, cta_engine, strategy_name, vt_symbol, setting):
+        super().__init__(cta_engine, strategy_name, vt_symbol, setting)
+
+        self.am = ArrayManager(100)
+
+        self.fast_ma = 0.0
+        self.slow_ma = 0.0
+        self.rl_approved = True
+
+        self.last_bar = None
+        self.rl_agent = None
+        self._load_rl_agent()
+
+    def _load_rl_agent(self):
+        try:
+            from ..rl_module import get_rl_agent
+            self.rl_agent = get_rl_agent()
+            self.write_log("RL agent loaded successfully")
+        except Exception as e:
+            self.write_log(f"Failed to load RL agent: {e}")
+            self.rl_enabled = False
+
+    def on_init(self) -> None:
+        self.write_log("RlEnhancedCtaStrategy initializing")
+        self.load_bar(10, Interval.MINUTE, self.on_bar)
+        self.inited = True
+        self.put_event()
+
+    def on_start(self) -> None:
+        self.write_log("RlEnhancedCtaStrategy started")
+        self.put_event()
+
+    def on_stop(self) -> None:
+        self.write_log("RlEnhancedCtaStrategy stopped")
+        self.cancel_all()
+        self.put_event()
+
+    def on_tick(self, tick: TickData) -> None:
+        return
+
+    def on_bar(self, bar: BarData) -> None:
+        self.am.update_bar(bar)
+
+        if not self.am.inited:
+            return
+
+        self.fast_ma = self.am.sma(self.fast_window)
+        self.slow_ma = self.am.sma(self.slow_window)
+
+        if not self.last_bar:
+            self.last_bar = bar
+            return
+
+        cta_signal = 0
+
+        if self.last_bar.close_price < self.slow_ma and bar.close_price > self.slow_ma:
+            if self.fast_ma > self.slow_ma:
+                cta_signal = 1
+
+        elif self.last_bar.close_price > self.slow_ma and bar.close_price < self.slow_ma:
+            if self.fast_ma < self.slow_ma:
+                cta_signal = -1
+
+        if cta_signal != 0 and self.rl_enabled and self.rl_agent:
+            rl_decision = self._validate_with_rl(bar, cta_signal)
+            self.rl_approved = rl_decision
+        else:
+            self.rl_approved = True
+
+        if cta_signal > 0 and self.pos == 0 and self.rl_approved:
+            self.buy(bar.close_price, self.fixed_size)
+
+        elif cta_signal < 0 and self.pos > 0 and self.rl_approved:
+            self.sell(bar.close_price, abs(self.pos))
+
+        elif cta_signal > 0 and self.pos > 0 and self.rl_approved:
+            self.sell(bar.close_price, abs(self.pos))
+
+        elif cta_signal < 0 and self.pos == 0 and self.rl_approved:
+            self.buy(bar.close_price, self.fixed_size)
+
+        self.last_bar = bar
+        self.sync_data()
+        self.put_event()
+
+    def _validate_with_rl(self, bar: BarData, cta_signal: int) -> bool:
+        try:
+            symbol = self.vt_symbol.split(".")[0] if "." in self.vt_symbol else self.vt_symbol
+
+            market_state = {
+                symbol: {
+                    "price": bar.close_price,
+                    "volume": bar.volume,
+                    "position": self.pos,
+                    "pnl": 0.0,
+                    "volatility": self.am.atr(14) if self.am.count >= 14 else 0.5,
+                    "trend": cta_signal
+                }
+            }
+
+            decision = self.rl_agent.get_action_with_risk(market_state)
+
+            if cta_signal > 0 and decision["action"] == "buy":
+                return True
+            elif cta_signal < 0 and decision["action"] == "sell":
+                return True
+
+            return False
+
+        except Exception as e:
+            self.write_log(f"RL validation error: {e}")
+            return True
+
+    def on_trade(self, trade: TradeData) -> None:
+        self.write_log(f"Trade executed: {trade.direction} {trade.volume}@{trade.price}")
+        self.put_event()
+
+    def on_order(self, order: OrderData) -> None:
+        self.put_event()
+
+    def on_stop_order(self, stop_order: StopOrder) -> None:
+        return
+
+
+class RlCtaSignal(CtaSignal):
+    """
+    RL-powered CTA Signal generator.
+    Generates signals based on RL agent decisions.
+    """
+    author = "Financial Orchestrator"
+
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.am = ArrayManager(100)
+        self.rl_agent = None
+        self.last_bar = None
+        self._load_rl_agent()
+
+    def _load_rl_agent(self):
+        try:
+            from ..rl_module import get_rl_agent
+            self.rl_agent = get_rl_agent()
+        except Exception:
+            pass
+
+    def on_bar(self, bar: BarData) -> None:
+        self.am.update_bar(bar)
+
+        if not self.am.inited or not self.rl_agent:
+            return
+
+        try:
+            symbol = "CRYPTO"
+            market_state = {
+                symbol: {
+                    "price": bar.close_price,
+                    "volume": bar.volume,
+                    "position": self.signal_pos,
+                    "pnl": 0.0,
+                    "volatility": self.am.atr(14) if self.am.count >= 14 else 0.5,
+                    "trend": 0
+                }
+            }
+
+            decision = self.rl_agent.get_action(market_state)
+
+            if decision["action"] == "buy":
+                self.set_signal_pos(1)
+            elif decision["action"] == "sell":
+                self.set_signal_pos(-1)
+            else:
+                self.set_signal_pos(0)
+
+        except Exception:
+            self.set_signal_pos(0)

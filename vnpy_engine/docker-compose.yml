@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: vnpy_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  vnpy_engine:
+    build:
+      context: ..
+      dockerfile: vnpy_engine/Dockerfile
+    working_dir: /vnpy
+    container_name: vnpy_engine
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+      - "8000:8000"
+    volumes:
+      - ./memory:/vnpy/memory
+      - ./logs:/vnpy/logs
+      - ./config:/vnpy/config
+      - ./models:/vnpy/models
+      - ../memory:/orchestrator/memory
+      - ../logs:/orchestrator/logs
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - BINANCE_API_KEY=${BINANCE_API_KEY:-}
+      - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - TRADING_MODE=${TRADING_MODE:-paper}
+      - RL_CHECKPOINT_INTERVAL=1800
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vnpy_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  prometheus_data:
+
+networks:
+  default:
+    name: vnpy_network

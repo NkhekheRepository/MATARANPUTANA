@@ -1,0 +1,79 @@
+# Backpressure Configuration
+# Controls queue overflow behavior and alerts
+
+backpressure:
+  global:
+    enabled: true
+    check_interval_ms: 1000
+    
+  # Stream-specific limits
+  streams:
+    market_data:
+      max_length: 10000
+      warning_threshold: 8000
+      critical_threshold: 9500
+      priority_levels:
+        - "critical"   # System alerts, kill switches
+        - "high"       # Real-time ticks
+        - "normal"     # Standard data
+        - "low"        # Batch processing
+        
+    system_alerts:
+      max_length: 5000
+      warning_threshold: 4000
+      critical_threshold: 4750
+      priority_levels:
+        - "critical"
+        - "high"
+        - "normal"
+        - "low"
+        
+    feature_output:
+      max_length: 5000
+      warning_threshold: 4000
+      critical_threshold: 4750
+      priority_levels:
+        - "high"
+        - "normal"
+        - "low"
+
+  # Drop policies
+  drop_policy:
+    strategy: "low_priority_first"  # Options: low_priority_first, oldest_first, random
+    preserve_critical: true           # Never drop critical priority
+    preserve_high: false             # Allow dropping high on extreme overflow
+    
+  # Recovery actions
+  recovery:
+    on_warning:
+      - action: "log"
+        message: "Queue at {percent}% capacity"
+      - action: "slow_down_producer"
+        factor: 0.9
+        
+    on_critical:
+      - action: "alert"
+        message: "Queue at critical capacity: {percent}%"
+      - action: "drop_low_priority"
+        count: 100
+      - action: "notify_telegram"
+        message: "Backpressure critical: {stream} queue at {percent}%"
+        
+    on_overflow:
+      - action: "drop_oldest"
+        count: 500
+      - action: "persist_to_disk"
+        stream: "market_data"
+      - action: "emergency_alert"
+        message: "Stream overflow: {stream}, dropped {count} events"
+
+  # Memory protection
+  memory_protection:
+    enabled: true
+    max_memory_mb: 6650
+    process_memory_check_ms: 5000
+    emergency_actions:
+      - action: "pause_ingestion"
+        duration_seconds: 30
+      - action: "flush_queues"
+      - action: "force_gc"

@@ -1,0 +1,98 @@
+# Risk Scoring Configuration for Financial Operations
+# Dynamic risk assessment with kill-switch policies
+
+risk_scoring_enabled: true
+risk_update_frequency: "5 minutes"  # How often to recalculate risk scores
+risk_lookback_window: "24 hours"   # Historical data to consider for risk calculation
+
+# Risk factor weights (must sum to 1.0)
+risk_factor_weights:
+  reliability: 0.25      # Historical success rate of agent/tasks
+  criticality: 0.20      # Importance of the operation to overall system
+  resource_usage: 0.15   # Computational/resource consumption
+  historical_performance: 0.20  # Recent performance trends
+  external_anomalies: 0.20  # Market/data anomalies affecting risk
+
+# Dynamic weight adjustments based on market regimes
+regime_adjustments:
+  high_volatility:
+    reliability: 0.20
+    criticality: 0.25
+    resource_usage: 0.10
+    historical_performance: 0.15
+    external_anomalies: 0.30
+  low_liquidity:
+    reliability: 0.25
+    criticality: 0.20
+    resource_usage: 0.15
+    historical_performance: 0.20
+    external_anomalies: 0.20
+  market_stress:
+    reliability: 0.15
+    criticality: 0.30
+    resource_usage: 0.10
+    historical_performance: 0.15
+    external_anomalies: 0.30
+
+# Risk thresholds
+risk_thresholds:
+  low: 0.3      # Below this: normal operations
+  medium: 0.6   # Between low and high: enhanced monitoring
+  high: 0.8     # Above this: require additional approvals
+  critical: 0.95 # Above this: trigger kill-switch consideration
+
+# Kill-switch policies
+kill_switch_policies:
+  enabled: true
+  # Automatic triggers (immediate stop)
+  automatic_triggers:
+    - condition: "risk_score > 0.95"
+      action: "halt_all_operations"
+      notification: "immediate"
+    - condition: "consecutive_failures > 3"
+      action: "halt_affected_workflows"
+      notification: "immediate"
+    - condition: "data_anomaly_detected"
+      subcondition: "price_deviation > 5sigma"
+      action: "halt_data_dependent_operations"
+      notification: "immediate"
+  
+  # Manual triggers (require human approval but recommended)
+  manual_triggers:
+    - condition: "risk_score > 0.85"
+      action: "request_human_review"
+      notification: "urgent"
+    - condition: "drawdown_exceeds_limit"
+      subcondition: "current_drawdown > max_allowed_drawdown * 0.8"
+      action: "reduce_position_sizes"
+      notification: "warning"
+
+# Escalation hierarchy
+escalation_hierarchy:
+  - level: "agent_self"
+    action: "log_warning"
+    timeout: "1 minute"
+  - level: "workflow_supervisor"
+    action: "pause_and_notify"
+    timeout: "5 minutes"
+  - level: "risk_management_team"
+    action: "convene_emergency_meeting"
+    timeout: "15 minutes"
+  - level: "system_administrator"
+    action: "immediate_system_halt"
+    timeout: "30 minutes"
+
+# Monitoring configurations
+monitoring:
+  metrics_to_track:
+    - "risk_score"
+    - "agent_performance"
+    - "workflow_success_rate"
+    - "data_quality_metrics"
+    - "model_drift_indicators"
+    - "resource_utilization"
+  alert_channels:
+    - "email"
+    - "slack"
+    - "sms"
+  dashboard_update_frequency: "1 minute"

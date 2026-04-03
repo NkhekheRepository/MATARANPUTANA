@@ -1,0 +1,24 @@
+[Unit]
+Description=Paper Trading Engine
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/financial_orchestrator
+Environment="PATH=/home/ubuntu/financial_orchestrator/venv/bin"
+Environment="PYTHONPATH=/home/ubuntu/financial_orchestrator"
+ExecStart=/home/ubuntu/financial_orchestrator/venv/bin/python run_paper_trading.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/home/ubuntu/financial_orchestrator/logs/paper_trading.log
+StandardError=append:/home/ubuntu/financial_orchestrator/logs/paper_trading_error.log
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/ubuntu/financial_orchestrator/logs /home/ubuntu/financial_orchestrator/memory
+
+[Install]
+WantedBy=multi-user.target

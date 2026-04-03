@@ -1,0 +1,178 @@
+{
+  "dashboard": {
+    "title": "Performance Analytics",
+    "tags": ["performance", "analytics"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Win Rate Trend",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "trading_win_rate",
+            "legendFormat": "Win Rate %",
+            "refId": "A"
+          }
+        ],
+        "thresholds": [
+          {"value": 45, "op": "lt", "colorMode": "critical", "fill": true},
+          {"value": 50, "op": "lt", "colorMode": "warning", "fill": true}
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 45},
+                {"color": "red", "value": 40}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Sharpe Ratio",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "trading_sharpe_ratio",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "green", "value": 1.5}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Sortino Ratio",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+        "targets": [
+          {
+            "expr": "trading_sortino_ratio",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Max Drawdown",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "trading_max_drawdown",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 500},
+                {"color": "red", "value": 1500}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Profit Factor",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 8, "y": 8},
+        "targets": [
+          {
+            "expr": "trading_profit_factor",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Calmar Ratio",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "trading_calmar_ratio",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Trade Count",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 16, "y": 8},
+        "targets": [
+          {
+            "expr": "trading_total_trades",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Daily Trades",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 20, "y": 8},
+        "targets": [
+          {
+            "expr": "trading_daily_trades",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Cumulative P&L",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "trading_cumulative_pnl",
+            "legendFormat": "Cumulative P&L",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Daily P&L",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "trading_daily_pnl",
+            "legendFormat": "Daily P&L",
+            "refId": "A"
+          }
+        ]
+      }
+    ],
+    "schemaVersion": 27,
+    "version": 1,
+    "refresh": "5s"
+  }
+}

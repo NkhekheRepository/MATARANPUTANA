@@ -1,0 +1,16 @@
+[Unit]
+Description=Financial Orchestrator System
+After=network.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/financial_orchestrator
+ExecStart=/home/ubuntu/financial_orchestrator/start_systemd.sh
+ExecStop=/home/ubuntu/financial_orchestrator/stop_systemd.sh
+RemainAfterExit=yes
+StandardOutput=append:/home/ubuntu/financial_orchestrator/logs/systemd.log
+StandardError=append:/home/ubuntu/financial_orchestrator/logs/systemd-error.log
+
+[Install]
+WantedBy=multi-user.target

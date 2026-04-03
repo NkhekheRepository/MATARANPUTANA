@@ -1,0 +1,145 @@
+{
+  "dashboard": {
+    "title": "Position Tracking",
+    "tags": ["positions", "trading"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Positions",
+        "type": "table",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "trading_position_size",
+            "format": "table",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Position P&L",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 10},
+        "targets": [
+          {
+            "expr": "trading_position_unrealized_pnl",
+            "legendFormat": "{{symbol}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Entry vs Current Price",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 10},
+        "targets": [
+          {
+            "expr": "trading_position_entry_price",
+            "legendFormat": "Entry {{symbol}}",
+            "refId": "A"
+          },
+          {
+            "expr": "trading_current_price",
+            "legendFormat": "Current {{symbol}}",
+            "refId": "B"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Positions by Side",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 18},
+        "targets": [
+          {
+            "expr": "count(trading_position_size > 0) by (side)",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Total Exposure",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 8, "x": 8, "y": 18},
+        "targets": [
+          {
+            "expr": "sum(trading_position_size * trading_current_price)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Leverage Usage",
+        "type": "gauge",
+        "gridPos": {"h": 4, "w": 8, "x": 16, "y": 18},
+        "targets": [
+          {
+            "expr": "trading_leverage",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "max": 10,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 7},
+                {"color": "red", "value": 9}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Capital Overview",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 26},
+        "targets": [
+          {
+            "expr": "trading_capital",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Available Capital",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 26},
+        "targets": [
+          {
+            "expr": "trading_capital - (sum(trading_position_size * trading_position_entry_price))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD"
+          }
+        }
+      }
+    ],
+    "schemaVersion": 27,
+    "version": 1,
+    "refresh": "5s"
+  }
+}

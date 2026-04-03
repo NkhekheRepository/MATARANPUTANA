@@ -1,0 +1,79 @@
+{
+  "workflow_id": "quant_research_001",
+  "workflow_name": "Example Quant Research Workflow",
+  "description": "Demonstration workflow for equity factor model development",
+  "start_time": "2026-03-29T15:00:00Z",
+  "status": "completed",
+  "current_phase": "Completed",
+  "progress_percentage": 100,
+  "phases": [
+    {
+      "name": "Data Acquisition",
+      "status": "completed",
+      "tasks": [
+        {
+          "id": "data_acq_001",
+          "name": "Market Data Ingestion",
+          "description": "Ingest price, volume, and fundamental data from OpenBB",
+          "agent_type": "Data Engineer",
+          "assigned_agent": "data_engineer_001",
+          "status": "completed",
+          "start_time": "2026-03-29T15:00:00Z",
+          "estimated_duration": "30 minutes",
+          "progress_percentage": 100,
+          "deliverables": [
+            "Raw market data in standardized format"
+          ],
+          "validation_results": {
+            "data_completeness": "passed",
+            "timestamp_consistency": "passed",
+            "price_volume_validity": "passed"
+          },
+          "actual_end_time": "2026-03-29T14:58:03.593726Z"
+        },
+        {
+          "id": "data_acq_002",
+          "name": "Alternative Data Integration",
+          "description": "Ingest alternative data (news, sentiment, macroeconomic)",
+          "agent_type": "Data Engineer",
+          "assigned_agent": "data_engineer_001",
+          "status": "completed",
+          "start_time": null,
+          "estimated_duration": "45 minutes",
+          "progress_percentage": 100,
+          "deliverables": [
+            "Integrated alternative dataset"
+          ],
+          "validation_results": {},
+          "actual_end_time": "2026-03-29T16:58:44.080750Z"
+        }
+      ]
+    },
+    {
+      "name": "Feature Engineering",
+      "status": "completed",
+      "tasks": [
+        {
+          "id": "feat_eng_001",
+          "name": "Technical Indicator Calculation",
+          "description": "Calculate technical indicators (moving averages, RSI, MACD, etc.)",
+          "agent_type": "Data Engineer",
+          "assigned_agent": "data_engineer_001",
+          "status": "completed",
+          "start_time": null,
+          "estimated_duration": "60 minutes",
+          "progress_percentage": 100,
+          "deliverables": [
+            "Technical indicator features"
+          ],
+          "validation_results": {},
+          "actual_end_time": "2026-03-29T16:59:16.084043Z"
+        }
+      ]
+    }
+  ],
+  "risk_score": 0.3,
+  "risk_level": "low",
+  "notes": "Workflow 100% complete. Current phase: Completed",
+  "last_updated": "2026-03-31T08:36:38.573266Z"
+}

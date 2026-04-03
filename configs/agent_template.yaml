@@ -1,0 +1,23 @@
+# Agent Configuration Template
+# Based on agency-agents patterns with financial specialization
+
+agent_id: ""
+agent_name: ""
+division: ""  # Engineering, Design, Paid Media, Sales, Marketing, Product, Project Management, Testing, Support, Spatial Computing, Specialized, Game Development
+role: ""  # Specific role within division
+personality_traits: []  # List of personality traits
+specializations: []  # List of specialized skills/domains
+financial_specializations: []  # Finance/quant specific specializations
+tools: []  # List of tools the agent can use
+responsibilities: []  # List of key responsibilities
+deliverables: []  # Expected outputs/deliverables
+communication_style: ""  # How the agent communicates
+collaboration_patterns: []  # How the agent works with others
+performance_metrics: {}  # Metrics for evaluating agent performance
+workload_capacity: 1  # Number of concurrent tasks the agent can handle
+current_workload: 0  # Current number of assigned tasks
+last_active: ""  # Timestamp of last activity
+status: "available"  # available, busy, offline, maintenance
+financial_data_sources: []  # Financial data sources the agent can access (OpenBB, Qlib, QuantLib, etc.)
+risk_tolerance: "medium"  # low, medium, high - for financial operations
+kill_switch_enabled: true  # Whether emergency stop is enabled for this agent

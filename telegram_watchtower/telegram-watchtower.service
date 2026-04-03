@@ -1,0 +1,16 @@
+[Unit]
+Description=Financial Orchestrator Telegram Watch Tower
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/financial_orchestrator
+ExecStart=/usr/bin/python3 /home/ubuntu/financial_orchestrator/telegram_watchtower/bot_controller.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/ubuntu/financial_orchestrator/logs/telegram_watchtower_new.log
+StandardError=append:/home/ubuntu/financial_orchestrator/logs/telegram_watchtower_new.log
+
+[Install]
+WantedBy=multi-user.target

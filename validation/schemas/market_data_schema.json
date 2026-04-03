@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Market Data Schema",
+  "description": "Schema for validated market data",
+  "type": "object",
+  "required": ["symbol", "timestamp", "open", "high", "low", "close", "volume"],
+  "properties": {
+    "symbol": {
+      "type": "string",
+      "description": "Stock symbol (e.g., AAPL)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the data point"
+    },
+    "open": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Opening price"
+    },
+    "high": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Highest price"
+    },
+    "low": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Lowest price"
+    },
+    "close": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Closing price"
+    },
+    "volume": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Trading volume"
+    },
+    "adj_close": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Adjusted closing price (optional)"
+    }
+  },
+  "additionalProperties": false
+}

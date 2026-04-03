@@ -1,0 +1,14 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'vnpy_engine'
+    static_configs:
+      - targets: ['fo_vnpy_engine:8000']
+    metrics_path: '/metrics'
+
+  - job_name: 'orchestrator'
+    static_configs:
+      - targets: ['fo_orchestrator:8080']
+    metrics_path: '/metrics'
