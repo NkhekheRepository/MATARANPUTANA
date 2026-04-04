@@ -67,6 +67,9 @@ class QuantCommandProcessor:
             '/metrics': self.cmd_metrics,
             '/regime': self.cmd_regime,
             
+            # Model Learning (NEW)
+            '/learning': self.cmd_learning,
+            
             # Help
             '/help': self.cmd_help,
             '/h': self.cmd_help,
@@ -662,7 +665,7 @@ New strategy: `{new_strategy}`
                 try:
                     dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
                     ts = dt.strftime('%m/%d %H:%M')
-                except:
+                except Exception:
                     pass
             
             lines.append(
@@ -794,12 +797,11 @@ New strategy: `{new_strategy}`
     
     def cmd_metrics(self, chat_id: int, text: str, bot) -> str:
         """Show comprehensive metrics"""
-        data = self._api_get('/api/pnl/summary')
+        pnl_data = self._api_get('/api/pnl/summary')
+        learning_data = self._api_get('/api/learning')
         
-        if 'error' in data:
-            return f"❌ Error: {data['error']}"
-        
-        metrics = data.get('metrics', {})
+        metrics = pnl_data.get('metrics', {})
+        sl = learning_data.get('self_learning', {})
         
         lines = [
             "📊 *PERFORMANCE METRICS*",
@@ -811,6 +813,12 @@ New strategy: `{new_strategy}`
             f"*Win Rate:*      {metrics.get('win_rate', 0):.1f}%",
             f"*Profit Factor:* {metrics.get('profit_factor', 0):.2f}",
             f"*Total Trades:*  {metrics.get('total_trades', 0)}",
+            "",
+            "🧠 *MODEL LEARNING*",
+            "─" * 24,
+            f"*Retrains:*   {sl.get('retrain_count', 0)}",
+            f"*Accuracy:*   {sl.get('model_accuracy', 0)*100:.1f}%",
+            f"*Buffer:*     {sl.get('buffer_size', 0)}/{sl.get('min_samples_required', 50)}",
         ]
         
         return "\n".join(lines)
@@ -834,6 +842,106 @@ New strategy: `{new_strategy}`
             f"*Regime:*  {emoji} {regime.upper()}",
             f"*Strategy:* {strategy}",
         ]
+        
+        return "\n".join(lines)
+    
+    def cmd_learning(self, chat_id: int, text: str, bot) -> str:
+        """Model Learning Status - shows self-learning engine metrics"""
+        data = self._api_get('/api/learning')
+        
+        if 'error' in data:
+            return f"Error: {data.get('error', 'Failed to fetch learning data')}"
+        
+        sl = data.get('self_learning', {})
+        ml = data.get('meta_learning', {})
+        win_rate = data.get('recent_win_rate', 0) * 100
+        current_regime = data.get('current_regime', 'unknown')
+        top_features = data.get('top_features', [])
+        decisions = data.get('decisions', {})
+        
+        buffer = sl.get('buffer_size', 0)
+        min_req = sl.get('min_samples_required', 50)
+        progress = min(100, int(buffer / min_req * 100)) if min_req > 0 else 0
+        bar_len = 10
+        filled = int(bar_len * progress / 100)
+        bar = '=' * filled + '-' * (bar_len - filled)
+        
+        status = "Training" if sl.get('is_training') else (
+            "Ready" if buffer >= min_req else f"Building {progress}%"
+        )
+        
+        accuracy = sl.get('model_accuracy', 0) * 100
+        retrain_count = sl.get('retrain_count', 0)
+        time_left = sl.get('time_to_retrain', 0)
+        
+        # Format feature importance
+        feature_str = ""
+        if top_features:
+            feature_lines = ["  Top Indicators Learned:"]
+            for f in top_features[:5]:
+                weight_pct = f.get('weight', 0) * 100
+                feature_lines.append(f"    {f.get('name', 'unknown')}: {weight_pct:.0f}%")
+            feature_str = "\n".join(feature_lines)
+        
+        # Format regime performance
+        regime_perf = ml.get('regime_performance', {})
+        regime_str = ""
+        if regime_perf:
+            regime_lines = ["  Regime Performance:"]
+            for regime, perf in regime_perf.items():
+                wr = perf.get('win_rate', 0) * 100
+                trades = perf.get('trades', 0)
+                regime_lines.append(f"    {regime}: {wr:.0f}% ({trades} trades)")
+            regime_str = "\n".join(regime_lines)
+        
+        # Format decision breakdown
+        decision_str = ""
+        if decisions:
+            buy_w = decisions.get('buy_signals', {}).get('wins', 0)
+            buy_l = decisions.get('buy_signals', {}).get('losses', 0)
+            sell_w = decisions.get('sell_signals', {}).get('wins', 0)
+            sell_l = decisions.get('sell_signals', {}).get('losses', 0)
+            
+            if buy_w + buy_l > 0 or sell_w + sell_l > 0:
+                decision_lines = ["  Decision Breakdown:"]
+                if buy_w + buy_l > 0:
+                    buy_wr = buy_w / (buy_w + buy_l) * 100 if (buy_w + buy_l) > 0 else 0
+                    decision_lines.append(f"    Buy Signals: {buy_w}W / {buy_l}L ({buy_wr:.0f}%)")
+                if sell_w + sell_l > 0:
+                    sell_wr = sell_w / (sell_w + sell_l) * 100 if (sell_w + sell_l) > 0 else 0
+                    decision_lines.append(f"    Sell Signals: {sell_w}W / {sell_l}L ({sell_wr:.0f}%)")
+                decision_str = "\n".join(decision_lines)
+        
+        lines = [
+            "🧠 MODEL LEARNING STATUS",
+            "=" * 30,
+            "",
+            "📊 Self-Learning Engine:",
+            f"  Buffer: {buffer}/{min_req} [{bar}]",
+            f"  Retrains: {retrain_count}",
+            f"  Accuracy: {accuracy:.1f}%",
+            f"  Win Rate: {win_rate:.1f}%",
+            f"  Status: {status}",
+            "",
+            f"🌊 Current Regime: {current_regime.upper()}",
+            "",
+            "🧠 Meta-Learning:",
+            f"  Regime: {ml.get('current_regime', 'unknown')}",
+        ]
+        
+        if regime_str:
+            lines.append(regime_str)
+        
+        if feature_str:
+            lines.extend(["", feature_str])
+        
+        if decision_str:
+            lines.extend(["", decision_str])
+        
+        lines.extend([
+            "",
+            f"📊 Dashboard: {self.dashboard_url}",
+        ])
         
         return "\n".join(lines)
     
@@ -872,6 +980,9 @@ New strategy: `{new_strategy}`
             "/winrate   - Win rate breakdown",
             "/metrics   - Full metrics",
             "/regime    - Market regime",
+            "",
+            "─── Model Learning ───",
+            "/learning  - Self-learning status",
             "",
             "─── System ───",
             "/system    - System status",

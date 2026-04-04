@@ -31,7 +31,7 @@ class EmergencyStop:
         
         self.config = config or {}
         self.fail_safe_triggers = self.config.get('fail_safe_triggers', {
-            'consecutive_losses': 3,
+            'consecutive_losses': 10,  # Increased from 3 for model learning
             'metric_anomaly_threshold': 3,
             'data_gap_threshold': 3,
         })

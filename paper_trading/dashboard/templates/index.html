@@ -285,6 +285,44 @@
                     </div>
                 </div>
             </div>
+            
+            <div class="card">
+                <h2>🧠 Model Learning</h2>
+                <div class="stat">
+                    <span class="stat-label">Current Regime</span>
+                    <span class="stat-value regime-badge" id="current-regime">UNKNOWN</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Retrain Count</span>
+                    <span class="stat-value" id="sl-retrain-count">0</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Experience Buffer</span>
+                    <span class="stat-value" id="sl-buffer-size">0 / 50</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Model Accuracy</span>
+                    <span class="stat-value" id="sl-accuracy">0%</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Win Rate</span>
+                    <span class="stat-value" id="sl-win-rate">0%</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Status</span>
+                    <span class="stat-value" id="sl-status">Idle</span>
+                </div>
+                
+                <div id="feature-importance" style="margin-top: 15px;">
+                    <h4 style="color: #888; margin: 10px 0 5px 0; font-size: 12px;">TOP INDICATORS LEARNED</h4>
+                    <div id="feature-bars" style="display: flex; flex-direction: column; gap: 4px;"></div>
+                </div>
+                
+                <div id="decision-breakdown" style="margin-top: 15px;">
+                    <h4 style="color: #888; margin: 10px 0 5px 0; font-size: 12px;">DECISION BREAKDOWN</h4>
+                    <div id="decision-stats" style="display: flex; gap: 15px; flex-wrap: wrap;"></div>
+                </div>
+            </div>
         </div>
         
         
@@ -362,13 +400,14 @@
     <script>
         async function fetchData() {
             try {
-                const [statusRes, pnlRes, positionsRes, healthRes, regimeRes, tradesRes] = await Promise.all([
+                const [statusRes, pnlRes, positionsRes, healthRes, regimeRes, tradesRes, learningRes] = await Promise.all([
                     fetch('/api/status'),
                     fetch('/api/pnl'),
                     fetch('/api/positions'),
                     fetch('/api/health'),
                     fetch('/api/regime'),
-                    fetch('/api/trades?limit=50')
+                    fetch('/api/trades?limit=50'),
+                    fetch('/api/learning')
                 ]);
                 
                 const status = await statusRes.json();
@@ -377,6 +416,7 @@
                 const health = await healthRes.json();
                 const regime = await regimeRes.json();
                 const trades = await tradesRes.json();
+                const learning = await learningRes.json();
                 
                 document.getElementById('capital').textContent = 
                     '$' + (status.capital || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
@@ -402,6 +442,82 @@
                 regimeEl.className = 'stat-value regime-' + (regime.regime || 'sideways');
                 
                 document.getElementById('timestamp').textContent = status.timestamp || '-';
+                
+                // Update Model Learning panel
+                const sl = learning.self_learning || {};
+                const ml = learning.meta_learning || {};
+                
+                // Current regime
+                const currentRegime = learning.current_regime || 'unknown';
+                const regimeEl = document.getElementById('current-regime');
+                const regimeEmoji = {'bull': '🐂', 'bear': '🐻', 'volatile': '⚡', 'sideways': '➡️'}.get(currentRegime, '❓');
+                regimeEl.textContent = regimeEmoji + ' ' + currentRegime.toUpperCase();
+                regimeEl.className = 'stat-value regime-' + currentRegime;
+                
+                document.getElementById('sl-retrain-count').textContent = sl.retrain_count || 0;
+                document.getElementById('sl-buffer-size').textContent = (sl.buffer_size || 0) + ' / ' + (sl.min_samples_required || 50);
+                
+                const accuracy = (sl.model_accuracy || 0) * 100;
+                document.getElementById('sl-accuracy').textContent = accuracy.toFixed(1) + '%';
+                
+                const winRate = (learning.recent_win_rate || 0) * 100;
+                document.getElementById('sl-win-rate').textContent = winRate.toFixed(1) + '%';
+                document.getElementById('sl-win-rate').className = 'stat-value ' + (winRate >= 50 ? 'positive' : 'negative');
+                
+                const slStatus = sl.is_training ? 'Training...' : (sl.buffer_size >= (sl.min_samples_required || 50) ? 'Ready' : 'Collecting');
+                document.getElementById('sl-status').textContent = slStatus;
+                
+                // Feature importance bars
+                const featureBars = document.getElementById('feature-bars');
+                const topFeatures = learning.top_features || [];
+                if (topFeatures.length > 0) {
+                    featureBars.innerHTML = topFeatures.map(f => {
+                        const weight = (f.weight || 0) * 100;
+                        return `<div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="width: 60px; font-size: 11px; color: #aaa;">${f.name || '?'}</span>
+                            <div style="flex: 1; height: 12px; background: #333; border-radius: 2px;">
+                                <div style="width: ${weight}%; height: 100%; background: linear-gradient(90deg, #00c853, #69f0ae); border-radius: 2px;"></div>
+                            </div>
+                            <span style="width: 30px; font-size: 10px; color: #666;">${weight.toFixed(0)}%</span>
+                        </div>`;
+                    }).join('');
+                } else {
+                    featureBars.innerHTML = '<div style="color: #666; font-size: 11px;">Training in progress...</div>';
+                }
+                
+                // Decision breakdown
+                const decisionStats = document.getElementById('decision-stats');
+                const decisions = learning.decisions || {};
+                if (Object.keys(decisions).length > 0) {
+                    const buy = decisions.buy_signals || {};
+                    const sell = decisions.sell_signals || {};
+                    let html = '';
+                    if (buy.wins !== undefined || buy.losses !== undefined) {
+                        const buyW = buy.wins || 0;
+                        const buyL = buy.losses || 0;
+                        const buyTotal = buyW + buyL;
+                        const buyWr = buyTotal > 0 ? (buyW / buyTotal * 100).toFixed(0) : 0;
+                        html += `<div style="background: #1e3a2f; padding: 8px 12px; border-radius: 6px; min-width: 80px;">
+                            <div style="color: #888; font-size: 10px;">BUY SIGNALS</div>
+                            <div style="color: ${buyWr >= 50 ? '#00c853' : '#ff5252'}; font-size: 16px; font-weight: bold;">${buyWr}%</div>
+                            <div style="color: #666; font-size: 10px;">${buyW}W / ${buyL}L</div>
+                        </div>`;
+                    }
+                    if (sell.wins !== undefined || sell.losses !== undefined) {
+                        const sellW = sell.wins || 0;
+                        const sellL = sell.losses || 0;
+                        const sellTotal = sellW + sellL;
+                        const sellWr = sellTotal > 0 ? (sellW / sellTotal * 100).toFixed(0) : 0;
+                        html += `<div style="background: #3a1e1e; padding: 8px 12px; border-radius: 6px; min-width: 80px;">
+                            <div style="color: #888; font-size: 10px;">SELL SIGNALS</div>
+                            <div style="color: ${sellWr >= 50 ? '#00c853' : '#ff5252'}; font-size: 16px; font-weight: bold;">${sellWr}%</div>
+                            <div style="color: #666; font-size: 10px;">${sellW}W / ${sellL}L</div>
+                        </div>`;
+                    }
+                    decisionStats.innerHTML = html;
+                } else {
+                    decisionStats.innerHTML = '<div style="color: #666; font-size: 11px;">Collecting decision data...</div>';
+                }
                 
                 const statusBadge = document.getElementById('status-badge');
                 const statusText = document.getElementById('status-text');

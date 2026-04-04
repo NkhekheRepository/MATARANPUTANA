@@ -217,6 +217,76 @@ def api_regime():
     })
 
 
+@app.route('/api/learning')
+@requires_auth
+def api_learning():
+    """Get model learning status."""
+    if engine is None:
+        logger.error("API /api/learning called but engine is None")
+        return jsonify({
+            'error': 'Engine not initialized',
+            'self_learning': {
+                'enabled': True,
+                'buffer_size': 0,
+                'min_samples_required': 50,
+                'retrain_count': 0,
+                'is_training': False,
+                'model_accuracy': 0.0,
+                'time_to_retrain': 0,
+                'last_retrain': 0,
+            },
+            'meta_learning': {
+                'enabled': True,
+                'current_regime': 'unknown',
+                'strategy_adjustments': {},
+            },
+            'recent_win_rate': 0.0,
+            'timestamp': ''
+        }), 200
+    
+    try:
+        status = engine.get_status()
+    except Exception as e:
+        logger.error(f"Error getting engine status: {e}")
+        return jsonify({'error': f'Engine error: {str(e)}'}), 500
+    
+    # Build comprehensive learning response
+    self_learning = status.get('self_learning', {})
+    meta_learning = status.get('meta_learning', {})
+    
+    return jsonify({
+        'self_learning': {
+            'enabled': self_learning.get('enabled', False),
+            'buffer_size': self_learning.get('buffer_size', 0),
+            'min_samples_required': self_learning.get('min_samples_required', 50),
+            'retrain_count': self_learning.get('retrain_count', 0),
+            'is_training': self_learning.get('is_training', False),
+            'model_accuracy': self_learning.get('model_accuracy', 0.0),
+            'time_to_retrain': self_learning.get('time_to_retrain', 0),
+            'last_retrain': self_learning.get('last_retrain', 0),
+        },
+        'meta_learning': {
+            'enabled': meta_learning.get('enabled', False),
+            'current_regime': meta_learning.get('current_regime', 'unknown'),
+            'strategy_adjustments': meta_learning.get('strategy_adjustments', {}),
+            'regime_performance': meta_learning.get('regime_performance', {}),
+        },
+        'current_regime': status.get('current_regime', 'unknown'),
+        'recent_win_rate': status.get('recent_win_rate', 0.0),
+        
+        # Feature importance from decision tree
+        'top_features': [
+            {'name': name, 'weight': weight} 
+            for name, weight in (status.get('feature_importance', {}) or meta_learning.get('feature_importance', {})).items()
+        ],
+        
+        # Signal outcome tracking
+        'decisions': status.get('signal_outcomes', {}),
+        
+        'timestamp': status.get('timestamp', '')
+    })
+
+
 @app.route('/api/start', methods=['POST'])
 @requires_auth
 def api_start():
@@ -344,7 +414,7 @@ def api_order_short():
             price_data = ss.get_position(f"{symbol}_price")
             if price_data:
                 price = price_data.get('price', 0)
-        except:
+        except Exception:
             pass
         
         if price <= 0:
@@ -365,7 +435,7 @@ def api_order_short():
                 max_size = max_dollar_pos / price
                 if size > max_size:
                     size = max_size * 0.95
-            except:
+            except Exception:
                 pass
         
         order = engine.order_manager.execute(
@@ -406,7 +476,7 @@ def api_order_close():
             price_data = ss.get_position(f"{symbol}_price")
             if price_data:
                 price = price_data.get('price', 0)
-        except:
+        except Exception:
             pass
         
         if not engine:
@@ -489,6 +559,29 @@ def api_record_strategy():
     if data.get('strategy'):
         data_tracker.record_strategy(data['strategy'], data.get('pnl', 0))
     return jsonify({'status': 'recorded'})
+
+@app.route('/api/diagnostics')
+@requires_auth
+def api_diagnostics():
+    """Full system diagnostic report for troubleshooting."""
+    from paper_trading.diagnostics import get_diagnostics
+    diag = get_diagnostics(engine)
+    return jsonify(diag.full_report())
+
+@app.route('/api/events')
+@requires_auth
+def api_events():
+    """Retrieve events, optionally filtered by trace_id or event_type."""
+    from paper_trading.diagnostics import get_diagnostics
+    diag = get_diagnostics(engine)
+    
+    trace_id = request.args.get('trace_id')
+    if trace_id:
+        return jsonify({"events": diag.get_event_chain(trace_id)})
+    
+    event_type = request.args.get('event_type')
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify({"events": diag.get_recent_events(event_type, limit)})
 
 @app.route('/metrics')
 def metrics():
