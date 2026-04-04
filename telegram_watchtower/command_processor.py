@@ -164,7 +164,7 @@ class CommandProcessor:
     
     def cmd_workflows(self, chat_id: int, text: str, bot) -> str:
         """Get active workflows"""
-        workflow_file = '/home/ubuntu/financial_orchestrator/logs/e2e_workflow_state.json'
+        workflow_file = '/home/ubuntu/MATARANPUTANA/logs/e2e_workflow_state.json'
         
         response = ["*Active Workflows*\n"]
         
@@ -222,7 +222,7 @@ class CommandProcessor:
             source_filter = parts[1]
         
         logs = []
-        log_dir = '/home/ubuntu/financial_orchestrator/logs'
+        log_dir = '/home/ubuntu/MATARANPUTANA/logs'
         
         if os.path.exists(log_dir):
             for log_file in ['risk_monitor.log', 'workflow_nohup.log', 'optimizer_nohup.log']:
@@ -330,7 +330,7 @@ class CommandProcessor:
         """Start the entire system"""
         logger.info(f"System start requested by chat_id={chat_id}")
         
-        script_path = '/home/ubuntu/financial_orchestrator/start_systemd.sh'
+        script_path = '/home/ubuntu/MATARANPUTANA/start_systemd.sh'
         
         if not os.path.exists(script_path):
             return "❌ Start script not found"
@@ -358,7 +358,7 @@ class CommandProcessor:
         """Stop the entire system"""
         logger.info(f"System stop requested by chat_id={chat_id}")
         
-        script_path = '/home/ubuntu/financial_orchestrator/stop_systemd.sh'
+        script_path = '/home/ubuntu/MATARANPUTANA/stop_systemd.sh'
         
         if not os.path.exists(script_path):
             return "❌ Stop script not found"
@@ -384,7 +384,7 @@ class CommandProcessor:
     
     def cmd_quick_status(self, chat_id: int, text: str, bot) -> str:
         """Quick status check of all components"""
-        logs_dir = '/home/ubuntu/financial_orchestrator/logs'
+        logs_dir = '/home/ubuntu/MATARANPUTANA/logs'
         
         components = [
             ('telegram', 'Telegram Bot'),
@@ -410,7 +410,7 @@ class CommandProcessor:
                         else:
                             response.append(f"❌ {name} (stale PID)")
                             all_running = False
-                except:
+                except Exception:
                     response.append(f"❌ {name} (error)")
                     all_running = False
             else:

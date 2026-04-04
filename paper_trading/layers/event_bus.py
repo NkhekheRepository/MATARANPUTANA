@@ -5,6 +5,7 @@ Structured event-driven communication layer with trace_id support
 for end-to-end debugging and replay capabilities.
 """
 
+import os
 import json
 import uuid
 import time
@@ -42,6 +43,8 @@ class EventType(Enum):
     # Layer 3: Signal Generation
     SIGNAL_GENERATED = "layer3:signal_generated"
     SIGNAL_AGGREGATED = "layer3:signal_aggregated"
+    VALIDATION_PASSED = "layer3:validation_passed"
+    VALIDATION_FAILED = "layer3:validation_failed"
     
     # Layer 4: Intelligence
     REGIME_DETECTED = "layer4:regime_detected"
@@ -62,6 +65,8 @@ class EventType(Enum):
     HEALING_ACTION_TRIGGERED = "layer6:healing_action_triggered"
     HEALING_ACTION_COMPLETED = "layer6:healing_action_completed"
     CONFIG_RELOADED = "layer6:config_reloaded"
+    WORKFLOW_PHASE_ADVANCED = "layer6:workflow_phase_advanced"
+    WORKFLOW_STATUS_UPDATED = "layer6:workflow_status_updated"
     
     # Layer 7: Command & Control
     COMMAND_RECEIVED = "layer7:command_received"
@@ -245,6 +250,7 @@ class ModelPredictionEvent(BaseEvent):
     regime: str = "sideways"
     decision_tree_vote: str = ""
     self_learning_vote: str = ""
+    rl_vote: str = ""
     base_signal: str = ""
     
     def __post_init__(self):
@@ -256,16 +262,18 @@ class EventBus:
     """
     Redis-based event bus with typed events and trace_id support.
     Provides publish/subscribe capabilities with event replay functionality.
+    Thread-safe: all subscriber operations protected by RLock.
     """
     
-    REDIS_HOST = "localhost"
-    REDIS_PORT = 6379
+    REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+    REDIS_PORT = int(os.environ.get("REDIS_PORT", "6379"))
     
     def __init__(self, redis_host: str = None, redis_port: int = None):
         self.redis_host = redis_host or self.REDIS_HOST
         self.redis_port = redis_port or self.REDIS_PORT
         self.redis_client: Optional[redis.Redis] = None
         self._subscribers: Dict[str, List[Callable]] = defaultdict(list)
+        self._lock = threading.RLock()
         self._running = False
         self._listener_thread: Optional[threading.Thread] = None
         
@@ -303,7 +311,7 @@ class EventBus:
         if self.redis_client:
             try:
                 self.redis_client.close()
-            except:
+            except Exception:
                 pass
             logger.info("EventBus disconnected from Redis")
     
@@ -347,16 +355,35 @@ class EventBus:
             
             # Call local subscribers immediately (synchronous dispatch)
             channel = f"fo:event:{event.event_type.value}"
-            if channel in self._subscribers:
-                for callback in self._subscribers[channel]:
-                    try:
-                        callback(event)
-                    except Exception as e:
-                        logger.error(f"Event callback error: {e}")
+            with self._lock:
+                subscribers = list(self._subscribers.get(channel, []))
             
-            logger.debug(f"Published event: {event.event_type.value} [trace_id: {event.trace_id[:8]}...]")
+            # Process all subscribers in threads to prevent blocking
+            for i, callback in enumerate(subscribers):
+                try:
+                    import threading
+                    result_holder = [None]
+                    exception_holder: List[Optional[Exception]] = [None]
+                    
+                    def run_callback():
+                        try:
+                            result_holder[0] = callback(event)
+                        except Exception as e:
+                            exception_holder[0] = e
+                    
+                    t = threading.Thread(target=run_callback, daemon=True)
+                    t.start()
+                    t.join(timeout=5)
+                    
+                    if t.is_alive():
+                        logger.warning(f"Callback {i} timed out after 5s")
+                    elif exception_holder[0]:
+                        raise exception_holder[0]
+                except Exception as e:
+                    logger.error(f"Error in callback {i}: {e}")
+            
             return True
-            
+        
         except Exception as e:
             logger.error(f"Failed to publish event: {e}")
             return False
@@ -365,15 +392,19 @@ class EventBus:
         """
         Subscribe to specific event types.
         Callback receives the deserialized event object.
+        Thread-safe: subscriber registration protected by lock.
         """
         try:
-            for event_type in event_types:
-                channel = f"fo:event:{event_type.value}"
-                self._subscribers[channel].append(callback)
+            with self._lock:
+                for event_type in event_types:
+                    channel = f"fo:event:{event_type.value}"
+                    self._subscribers[channel].append(callback)
+                
+                should_start = not self._running and self.redis_client
+                if should_start:
+                    self._running = True
             
-            # Start listener thread if not already running
-            if not self._running and self.redis_client:
-                self._running = True
+            if should_start:
                 self._listener_thread = threading.Thread(target=self._listen_loop, daemon=True)
                 self._listener_thread.start()
             
@@ -391,8 +422,8 @@ class EventBus:
         
         pubsub = self.redis_client.pubsub()
         
-        # Subscribe to all channels we have callbacks for
-        channels = [ch for ch in self._subscribers.keys()]
+        with self._lock:
+            channels = [ch for ch in self._subscribers.keys()]
         if channels:
             try:
                 pubsub.subscribe(*channels)
@@ -412,12 +443,13 @@ class EventBus:
                             event_dict = json.loads(data)
                             event = BaseEvent.from_dict(event_dict)
                             
-                            if channel in self._subscribers:
-                                for callback in self._subscribers[channel]:
-                                    try:
-                                        callback(event)
-                                    except Exception as e:
-                                        logger.error(f"Event callback error: {e}")
+                            with self._lock:
+                                callbacks = list(self._subscribers.get(channel, []))
+                            for callback in callbacks:
+                                try:
+                                    callback(event)
+                                except Exception as e:
+                                    logger.error(f"Event callback error: {e}")
                                         
                         except json.JSONDecodeError as e:
                             logger.error(f"Failed to deserialize event: {e}")
@@ -432,7 +464,7 @@ class EventBus:
             try:
                 pubsub.unsubscribe()
                 pubsub.close()
-            except:
+            except Exception:
                 pass
     
     def get_event_by_trace_id(self, trace_id: str) -> Optional[BaseEvent]:
@@ -529,7 +561,7 @@ class EventBus:
             try:
                 self.redis_client.ping()
                 status["connected"] = True
-            except:
+            except Exception:
                 status["connected"] = False
         else:
             status["connected"] = False
@@ -540,13 +572,16 @@ class EventBus:
 
 # Global event bus instance
 _event_bus_instance: Optional[EventBus] = None
+_event_bus_lock = threading.Lock()
 
 
 def get_event_bus() -> EventBus:
-    """Get singleton event bus instance."""
+    """Get singleton event bus instance. Thread-safe with double-checked locking."""
     global _event_bus_instance
     if _event_bus_instance is None:
-        _event_bus_instance = EventBus()
+        with _event_bus_lock:
+            if _event_bus_instance is None:
+                _event_bus_instance = EventBus()
     return _event_bus_instance
 
 
@@ -694,8 +729,8 @@ def publish_self_learning_update(retrain_count: int, buffer_size: int,
 
 
 def publish_model_prediction(ensemble_action: str, confidence: float,
-                              regime: str, decision_tree_vote: str = "",
-                              self_learning_vote: str = "", base_signal: str = ""):
+                               regime: str, decision_tree_vote: str = "",
+                               self_learning_vote: str = "", rl_vote: str = "", base_signal: str = ""):
     """Publish a model prediction event."""
     event = ModelPredictionEvent(
         event_type=EventType.MODEL_PREDICTION,
@@ -704,6 +739,7 @@ def publish_model_prediction(ensemble_action: str, confidence: float,
         regime=regime,
         decision_tree_vote=decision_tree_vote,
         self_learning_vote=self_learning_vote,
+        rl_vote=rl_vote,
         base_signal=base_signal,
     )
     return get_event_bus().publish(event)

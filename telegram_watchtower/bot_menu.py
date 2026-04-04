@@ -49,9 +49,9 @@ class BotMenu:
                 {"text": "🔔 Alerts", "callback_data": CALLBACK_ACTIONS['alerts']},
             ],
             [
+                {"text": "🧠 Learning", "callback_data": "learning_metrics"},
                 {"text": "📁 Workflows", "callback_data": CALLBACK_ACTIONS['workflows']},
                 {"text": "💻 Agents", "callback_data": CALLBACK_ACTIONS['agents']},
-                {"text": "📄 Logs", "callback_data": CALLBACK_ACTIONS['logs']},
             ],
             [
                 {"text": "🔒 Hide Menu", "callback_data": CALLBACK_ACTIONS['hide_menu']},
@@ -223,6 +223,9 @@ Use the menu below or type commands directly."""
             elif action == CALLBACK_ACTIONS['alerts']:
                 return bot.command_processor.cmd_alerts(chat_id, '/alerts', bot)
             
+            elif action == 'learning_metrics':
+                return bot.quant_processor.cmd_learning(chat_id, '/learning', bot)
+            
             elif action == CALLBACK_ACTIONS['hide_menu']:
                 return "🔒 Menu hidden. Send /menu to show it again."
             
@@ -237,7 +240,7 @@ Use the menu below or type commands directly."""
     def _system_on(self, bot) -> str:
         """Start the system"""
         logger.info("System start requested via menu")
-        script_path = '/home/ubuntu/financial_orchestrator/start_systemd.sh'
+        script_path = '/home/ubuntu/MATARANPUTANA/start_systemd.sh'
         
         if not os.path.exists(script_path):
             return "❌ Start script not found"
@@ -262,7 +265,7 @@ Use the menu below or type commands directly."""
     def _system_off(self, bot) -> str:
         """Stop the system"""
         logger.info("System stop requested via menu")
-        script_path = '/home/ubuntu/financial_orchestrator/stop_systemd.sh'
+        script_path = '/home/ubuntu/MATARANPUTANA/stop_systemd.sh'
         
         if not os.path.exists(script_path):
             return "❌ Stop script not found"
@@ -289,8 +292,8 @@ Use the menu below or type commands directly."""
         logger.info("System restart requested via menu")
         
         try:
-            stop_script = '/home/ubuntu/financial_orchestrator/stop_systemd.sh'
-            start_script = '/home/ubuntu/financial_orchestrator/start_systemd.sh'
+            stop_script = '/home/ubuntu/MATARANPUTANA/stop_systemd.sh'
+            start_script = '/home/ubuntu/MATARANPUTANA/start_systemd.sh'
             
             subprocess.run(['/bin/bash', stop_script], capture_output=True, timeout=15)
             subprocess.run(['/bin/bash', start_script], capture_output=True, timeout=30)

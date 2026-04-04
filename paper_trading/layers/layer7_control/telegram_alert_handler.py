@@ -13,6 +13,7 @@ from ..event_bus import (
     EventType,
     BaseEvent,
     RiskCheckEvent,
+    SelfLearningUpdateEvent,
 )
 
 try:
@@ -40,6 +41,7 @@ class TelegramAlertHandler:
                     EventType.CIRCUIT_BREAKER_TRIGGERED,
                     EventType.EMERGENCY_STOP_ACTIVATED,
                     EventType.ORDER_EXECUTED,
+                    EventType.SELF_LEARNING_UPDATE,
                 ],
                 self._on_event,
             )
@@ -71,6 +73,8 @@ class TelegramAlertHandler:
             self._handle_circuit_breaker(event)
         elif event_type_val == EventType.ORDER_EXECUTED.value:
             self._handle_order_executed(event)
+        elif event_type_val == EventType.SELF_LEARNING_UPDATE.value:
+            self._handle_self_learning_update(event)
 
     def _handle_risk_breach(self, event: BaseEvent) -> None:
         """Format and send a risk-limit-breach alert."""
@@ -155,3 +159,32 @@ class TelegramAlertHandler:
                 logger.info(f"[DRY-RUN] Telegram trade alert: {action} {symbol} {quantity}")
         except Exception as e:
             logger.error(f"Failed to send Telegram trade alert: {e}")
+    
+    def _handle_self_learning_update(self, event: BaseEvent) -> None:
+        """Send notification for model retraining."""
+        try:
+            retrain_count = getattr(event, 'retrain_count', 0)
+            buffer_size = getattr(event, 'buffer_size', 0)
+            model_accuracy = getattr(event, 'model_accuracy', 0.0)
+            dt_trained = getattr(event, 'decision_tree_trained', False)
+            
+            message = (
+                f"🧠 MODEL LEARNING UPDATE\n"
+                f"Retrain #{retrain_count}\n"
+                f"Experience Buffer: {buffer_size} samples\n"
+                f"Model Accuracy: {model_accuracy*100:.1f}%\n"
+                f"Decision Tree: {'Trained' if dt_trained else 'Not trained'}"
+            )
+            
+            if _TELEGRAM_AVAILABLE:
+                import telegram_notify as _tn4
+                _tn4.send_alert(
+                    component_name="SelfLearning",
+                    level="INFO",
+                    message=message,
+                )
+                logger.info(f"Telegram self-learning alert sent: retrain #{retrain_count}")
+            else:
+                logger.info(f"[DRY-RUN] Telegram self-learning alert: retrain #{retrain_count}")
+        except Exception as e:
+            logger.error(f"Failed to send Telegram self-learning alert: {e}")

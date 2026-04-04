@@ -5,6 +5,8 @@ Supports paper (simulated) and testnet (Binance testnet) modes.
 """
 
 import os
+import random
+import threading
 from typing import Dict, Any, Optional, List, Callable, Union
 from datetime import datetime
 from enum import Enum
@@ -101,9 +103,11 @@ class Order:
 
 
 class OrderManager:
-    """Manages orders and positions."""
+    """Manages orders and positions. Thread-safe."""
     
     def __init__(self, config: Dict[str, Any]):
+        self._lock = threading.RLock()
+        
         self.leverage = config.get('leverage', 75)
         self.mode = config.get('mode', 'paper')
         
@@ -217,7 +221,6 @@ class OrderManager:
     
     def _apply_slippage(self, price: float, side: str) -> float:
         """Apply simulated slippage to fill price."""
-        import random
         slippage = price * self.slippage_pct * random.uniform(0.5, 1.5)
         if side in ('buy', 'long'):
             return price + slippage
@@ -426,7 +429,7 @@ class OrderManager:
                         if isinstance(v, str):
                             try:
                                 pos_copy[k] = float(v)
-                            except:
+                            except Exception:
                                 pass
                     pnl_calc = self._calculate_pnl(pos_copy, filled_qty, fill_price)
                     if pnl_calc is not None:
@@ -505,79 +508,81 @@ class OrderManager:
     
     def _update_position(self, symbol: str, side: str, size: float, 
                          price: float, leverage: Optional[int]):
-        """Update position."""
-        if symbol not in self.positions:
-            self.positions[symbol] = {
-                'size': 0,
-                'entry_price': 0,
-                'leverage': leverage,
-                'side': None,
-                'pnl': 0,
-                'unrealized_pnl': 0
-            }
-        
-        position = self.positions[symbol]
-        
-        was_empty = position['size'] == 0
-        
-        if position['size'] == 0:
-            position['size'] = size if side == 'long' else -size
-            position['entry_price'] = price
-            position['side'] = side
-        else:
-            existing_side = 'long' if position['size'] > 0 else 'short'
+        """Update position. Thread-safe."""
+        with self._lock:
+            if symbol not in self.positions:
+                self.positions[symbol] = {
+                    'size': 0,
+                    'entry_price': 0,
+                    'leverage': leverage,
+                    'side': None,
+                    'pnl': 0,
+                    'unrealized_pnl': 0
+                }
             
-            if side == existing_side:
-                position['size'] += size if side == 'long' else -size
-                position['entry_price'] = (position['entry_price'] * (abs(position['size']) - size) + 
-                                            price * size) / abs(position['size'])
+            position = self.positions[symbol]
+            
+            was_empty = position['size'] == 0
+            
+            if position['size'] == 0:
+                position['size'] = size if side == 'long' else -size
+                position['entry_price'] = price
+                position['side'] = side
             else:
-                if abs(position['size']) >= size:
+                existing_side = 'long' if position['size'] > 0 else 'short'
+                
+                if side == existing_side:
                     position['size'] += size if side == 'long' else -size
-                    if position['size'] == 0:
-                        position['entry_price'] = 0
-                        position['side'] = None
+                    position['entry_price'] = (position['entry_price'] * (abs(position['size']) - size) + 
+                                                price * size) / abs(position['size'])
                 else:
-                    remaining = size - abs(position['size'])
-                    position['size'] = size if side == 'long' else -size
-                    position['entry_price'] = price
-                    position['side'] = side
-        
-        position['leverage'] = leverage
-        
-        if was_empty and self.trade_logger:
-            self.trade_logger.log_open_position(
-                symbol=symbol,
-                side=side,
-                quantity=abs(size),
-                entry_price=price,
-                order_id="",
-                strategy="engine",
-                leverage=leverage or 1,
-            )
+                    if abs(position['size']) >= size:
+                        position['size'] += size if side == 'long' else -size
+                        if position['size'] == 0:
+                            position['entry_price'] = 0
+                            position['side'] = None
+                    else:
+                        remaining = size - abs(position['size'])
+                        position['size'] = size if side == 'long' else -size
+                        position['entry_price'] = price
+                        position['side'] = side
+            
+            position['leverage'] = leverage
+            
+            if was_empty and self.trade_logger:
+                self.trade_logger.log_open_position(
+                    symbol=symbol,
+                    side=side,
+                    quantity=abs(size),
+                    entry_price=price,
+                    order_id="",
+                    strategy="engine",
+                    leverage=leverage or 1,
+                )
     
     def _reduce_position(self, symbol: str, size: float):
-        """Reduce position by size, correctly handling longs and shorts."""
-        position = self.positions.get(symbol)
-        
-        if position:
-            was_open = position.get('size', 0) != 0
+        """Reduce position by size, correctly handling longs and shorts. Thread-safe."""
+        with self._lock:
+            position = self.positions.get(symbol)
             
-            if position['size'] > 0:
-                position['size'] = position['size'] - size
-            else:
-                position['size'] = position['size'] + size
-            
-            is_closed = abs(position['size']) < 1e-10
-            
-            if is_closed:
-                position['size'] = 0
-                position['entry_price'] = 0
-                position['side'] = None
-                position['unrealized_pnl'] = 0
+            if position:
+                was_open = position.get('size', 0) != 0
                 
-                if was_open and self.trade_logger:
-                    pass  # PnL is calculated in close_position method
+                if position['size'] > 0:
+                    position['size'] = position['size'] - size
+                else:
+                    position['size'] = position['size'] + size
+                
+                is_closed = abs(position['size']) < 1e-10
+                
+                if is_closed:
+                    position['size'] = 0
+                    position['entry_price'] = 0
+                    position['side'] = None
+                    position['unrealized_pnl'] = 0
+                    
+                    if was_open and self.trade_logger:
+                        pass  # PnL is calculated in close_position method
     
     def _calculate_pnl(self, position: Dict[str, Any], size: float, 
                        close_price: float) -> float:
@@ -600,27 +605,33 @@ class OrderManager:
             return 0.0
     
     def update_unrealized_pnl(self, symbol: str, current_price: float):
-        """Update unrealized PnL."""
-        position = self.positions.get(symbol)
-        
-        if position and position.get('size', 0) != 0:
-            entry_price = position['entry_price']
+        """Update unrealized PnL. Thread-safe."""
+        with self._lock:
+            position = self.positions.get(symbol)
             
-            if position['size'] > 0:
-                position['unrealized_pnl'] = (current_price - entry_price) * abs(position['size'])
-            else:
-                position['unrealized_pnl'] = (entry_price - current_price) * abs(position['size'])
+            if position and position.get('size', 0) != 0:
+                entry_price = position['entry_price']
+                
+                if position['size'] > 0:
+                    position['unrealized_pnl'] = (current_price - entry_price) * abs(position['size'])
+                else:
+                    position['unrealized_pnl'] = (entry_price - current_price) * abs(position['size'])
     
     def get_position(self, symbol: str) -> Dict[str, Any]:
-        """Get position for symbol."""
-        return self.positions.get(symbol, {
+        """Get position for symbol. Thread-safe."""
+        with self._lock:
+            pos = self.positions.get(symbol)
+            if pos:
+                return dict(pos)
+        return {
             'size': 0, 'entry_price': 0, 'leverage': 1,
             'side': None, 'pnl': 0, 'unrealized_pnl': 0
-        })
+        }
     
     def get_all_positions(self) -> Dict[str, Dict[str, Any]]:
-        """Get all positions."""
-        return self.positions
+        """Get all positions. Thread-safe snapshot."""
+        with self._lock:
+            return {k: dict(v) for k, v in self.positions.items()}
     
     def get_order(self, order_id: str) -> Optional[Order]:
         """Get order by ID."""

@@ -20,7 +20,7 @@ class TradingBotIntegration:
         self.alert_callback = None
         self.connected = False
         
-    def initialize(self, config: Dict[str, Any] = None) -> bool:
+    def initialize(self, config: Optional[Dict[str, Any]] = None) -> bool:
         """Initialize connection to paper trading engine via API."""
         try:
             import requests
@@ -67,7 +67,7 @@ class TradingBotIntegration:
         except Exception as e:
             return {'error': str(e)}
     
-    def _api_post(self, endpoint: str, data: Dict = None) -> Dict:
+    def _api_post(self, endpoint: str, data: Optional[Dict] = None) -> Dict:
         """Make POST request to dashboard"""
         import requests
         try:
@@ -118,98 +118,26 @@ class TradingBotIntegration:
     def set_trading_engine(self, engine):
         """Legacy compatibility - accept engine object."""
         pass
-        """Stop the futures engine."""
-        if self.futures_engine:
-            self.futures_engine.stop()
-    
-    def get_status(self) -> Dict[str, Any]:
-        """Get trading status."""
-        if not self.futures_engine:
-            return {"error": "Engine not initialized"}
-        
-        return self.futures_engine.get_status()
-    
-    def long(self, quantity: float) -> Dict[str, Any]:
-        """Open LONG position."""
-        if not self.futures_engine:
-            return {"error": "Engine not initialized"}
-        
-        result = self.futures_engine.open_long(quantity)
-        
-        if self.alert_callback and 'orderId' in result:
-            self.alert_callback(self._format_trade_alert("LONG", result))
-        
-        return result
-    
-    def short(self, quantity: float) -> Dict[str, Any]:
-        """Open SHORT position."""
-        if not self.futures_engine:
-            return {"error": "Engine not initialized"}
-        
-        result = self.futures_engine.open_short(quantity)
-        
-        if self.alert_callback and 'orderId' in result:
-            self.alert_callback(self._format_trade_alert("SHORT", result))
-        
-        return result
-    
-    def close(self) -> Dict[str, Any]:
-        """Close position."""
-        if not self.futures_engine:
-            return {"error": "Engine not initialized"}
-        
-        result = self.futures_engine.close_all()
-        
-        if self.alert_callback and 'orderId' in result:
-            self.alert_callback(self._format_close_alert(result))
-        
-        return result
-    
-    def set_leverage(self, leverage: int):
-        """Set leverage (1-75)."""
-        if not self.futures_engine:
-            return {"error": "Engine not initialized"}
-        
-        self.futures_engine.set_leverage(leverage)
-        return {"success": True, "leverage": leverage}
-    
+
     def get_balance(self) -> float:
-        """Get wallet balance."""
-        if not self.futures_engine:
-            return 0.0
-        
-        return self.futures_engine.client.get_balance()
-    
-    def get_price(self, symbol: str = None) -> float:
-        """Get current price."""
-        if not self.futures_engine:
-            return 0.0
-        
-        sym = symbol or self.futures_engine.symbol
-        return self.futures_engine.client.get_symbol_price(sym)
-    
+        """Get wallet balance via API."""
+        data = self._api_get('/api/balance')
+        return data.get('balance', 0.0)
+
+    def get_price(self, symbol: Optional[str] = None) -> float:
+        """Get current price via API."""
+        data = self._api_get(f'/api/price/{symbol or "BTCUSDT"}')
+        return data.get('price', 0.0)
+
     def get_positions(self) -> List[Dict[str, Any]]:
-        """Get all open positions."""
-        if not self.futures_engine:
-            return []
-        
-        return self.futures_engine.client.get_all_positions()
-    
-    def get_trade_history(self, symbol: str = None, limit: int = 20) -> List[Dict[str, Any]]:
-        """Get trade history."""
-        if not self.futures_engine:
-            return []
-        
-        sym = symbol or self.futures_engine.symbol
-        return self.futures_engine.client.get_trade_history(sym, limit)
-    
-    def get_liquidation_warning(self, symbol: str = None) -> Optional[str]:
-        """Get liquidation warning."""
-        if not self.futures_engine:
-            return None
-        
-        sym = symbol or self.futures_engine.symbol
-        return self.futures_engine.client.get_liquidation_warning(sym)
+        """Get all open positions via API."""
+        data = self._api_get('/api/positions')
+        return data.get('positions', [])
+
+    def get_liquidation_warning(self, symbol: Optional[str] = None) -> Optional[str]:
+        """Get liquidation warning via API."""
+        data = self._api_get(f'/api/liquidation/{symbol or "BTCUSDT"}')
+        return data.get('warning')
     
     def set_alert_callback(self, callback):
         """Set callback for trade alerts."""

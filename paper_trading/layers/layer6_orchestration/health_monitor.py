@@ -163,7 +163,7 @@ class HealthMonitor:
         if name in self.components:
             try:
                 return self.components[name]['check_func']()
-            except:
+            except Exception:
                 return False
         return None
     
@@ -214,7 +214,7 @@ class ComponentHealth:
             try:
                 engine.get_risk_status()
                 return True
-            except:
+            except Exception:
                 return False
         return True
     
@@ -225,7 +225,7 @@ class ComponentHealth:
             try:
                 manager.get_all_positions()
                 return True
-            except:
+            except Exception:
                 return False
         return True
 

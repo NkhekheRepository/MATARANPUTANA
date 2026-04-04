@@ -27,7 +27,7 @@ class BotStatus(Enum):
     ERROR = "error"
 
 class TelegramWatchtower:
-    def __init__(self, config_path='/home/ubuntu/financial_orchestrator/telegram_watchtower/config.yaml'):
+    def __init__(self, config_path='/home/ubuntu/MATARANPUTANA/telegram_watchtower/config.yaml'):
         self.config_path = config_path
         self.config = self.load_config()
         self.status = BotStatus.STOPPED
@@ -362,7 +362,7 @@ class TelegramWatchtower:
             parts.append(f"{minutes}m")
             
             return " ".join(parts)
-        except:
+        except Exception:
             return "unknown"
     
     def poll_updates(self):

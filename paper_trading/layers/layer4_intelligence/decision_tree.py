@@ -103,10 +103,10 @@ class DecisionTreeAgent:
         momentum = features[0, 5] if features.shape[1] > 5 else 0
         
         trend_strength = abs(price_change)
-        if trend_strength > 0.02 and momentum > 0:
-            return {'action': 'buy', 'confidence': 0.5}
-        elif trend_strength > 0.02 and momentum < 0:
-            return {'action': 'sell', 'confidence': 0.5}
+        if trend_strength > 0.01 and momentum > 0:
+            return {'action': 'buy', 'confidence': 0.55}
+        elif trend_strength > 0.01 and momentum < 0:
+            return {'action': 'sell', 'confidence': 0.55}
         else:
             return {'action': 'hold', 'confidence': 0.7}
     

@@ -47,6 +47,7 @@ async def start_command(update: Update, context: CallbackContext):
         "/pnl - P&L report\n"
         "/strategy - Current strategy\n"
         "/regime - Market regime\n"
+        "/learning - Model learning status\n"
         "/start_trading - Resume trading\n"
         "/stop_trading - Pause trading\n"
         "/emergency - Emergency stop\n"
@@ -186,6 +187,38 @@ async def regime_command(update: Update, context: CallbackContext):
     await update.message.reply_text(message, parse_mode='Markdown')
 
 
+async def learning_command(update: Update, context: CallbackContext):
+    """Handle /learning command - show model learning status."""
+    if engine_instance is None:
+        await update.message.reply_text("❌ Engine not initialized")
+        return
+    
+    status = engine_instance.get_status()
+    sl = status.get('self_learning', {})
+    ml = status.get('meta_learning', {})
+    win_rate = status.get('recent_win_rate', 0) * 100
+    
+    status_text = "🔴 Training" if sl.get('is_training') else (
+        "🟢 Ready" if sl.get('buffer_size', 0) >= sl.get('min_samples_required', 50) else "🟡 Collecting"
+    )
+    
+    message = f"""
+🧠 *Model Learning Status*
+━━━━━━━━━━━━━━━━━━━━━━━━━
+📚 Experience Buffer: {sl.get('buffer_size', 0)} / {sl.get('min_samples_required', 50)}
+🔄 Retrain Count: {sl.get('retrain_count', 0)}
+🎯 Model Accuracy: {(sl.get('model_accuracy', 0) * 100):.1f}%
+⏱️ Time to Retrain: {sl.get('time_to_retrain', 0)}s
+📈 Win Rate: {win_rate:.1f}%
+Status: {status_text}
+
+📊 Meta-Learning:
+🔄 Regime: {ml.get('current_regime', 'unknown')}
+"""
+    
+    await update.message.reply_text(message, parse_mode='Markdown')
+
+
 async def start_trading_command(update: Update, context: CallbackContext):
     """Handle /start_trading command."""
     if engine_instance is None:
@@ -295,6 +328,7 @@ def setup_bot(token: str = None) -> Application:
     app.add_handler(CommandHandler("pnl", pnl_command))
     app.add_handler(CommandHandler("strategy", strategy_command))
     app.add_handler(CommandHandler("regime", regime_command))
+    app.add_handler(CommandHandler("learning", learning_command))
     app.add_handler(CommandHandler("start_trading", start_trading_command))
     app.add_handler(CommandHandler("stop_trading", stop_trading_command))
     app.add_handler(CommandHandler("emergency", emergency_command))

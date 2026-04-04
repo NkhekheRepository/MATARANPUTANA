@@ -7,23 +7,26 @@ Replaces custom Binance clients with VN.PY's market data infrastructure.
 
 import os
 import time
+import random
 import threading
 from typing import Dict, Any, Optional, List, Callable
 from collections import deque
 from datetime import datetime
 from loguru import logger
 
-# Import from vnpy_engine
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+# Import from vnpy_engine - moved inside connect() for faster startup
+# try:
+#     from vnpy_engine.vnpy_local.market_data import get_market_data_instance, BinanceMarketData
+#     from vnpy_engine.vnpy_local.shared_state import shared_state
+#     VNPY_AVAILABLE = True
+# except ImportError as e:
+#     logger.warning(f"VN.PY imports not available: {e}")
+#     VNPY_AVAILABLE = False
 
-try:
-    from vnpy_engine.vnpy_local.market_data import get_market_data_instance, BinanceMarketData
-    from vnpy_engine.vnpy_local.shared_state import shared_state
-    VNPY_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"VN.PY imports not available: {e}")
-    VNPY_AVAILABLE = False
+# Set to False initially, check in connect()
+VNPY_AVAILABLE = False
+get_market_data_instance = None
+shared_state = None
 
 
 class VNPyDataBridge:
@@ -59,18 +62,48 @@ class VNPyDataBridge:
     def connect(self) -> bool:
         """Connect to VN.PY market data feed."""
         try:
+            start_time = time.time()
+            logger.info("Starting VNPyDataBridge connection...")
+            
+            # Lazy import VN.PY modules here to avoid slow startup
+            global VNPY_AVAILABLE, get_market_data_instance, shared_state
+            if not VNPY_AVAILABLE:
+                try:
+                    import sys
+                    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+                    from vnpy_engine.vnpy_local.market_data import get_market_data_instance, BinanceMarketData
+                    from vnpy_engine.vnpy_local.shared_state import shared_state
+                    VNPY_AVAILABLE = True
+                    logger.info("VN.PY modules imported successfully")
+                except ImportError as e:
+                    logger.warning(f"VN.PY imports not available: {e}")
+                    VNPY_AVAILABLE = False
+            
             if VNPY_AVAILABLE:
                 # Use VN.PY market data
+                logger.info("Initializing VN.PY market data instance...")
+                instance_start = time.time()
                 self.market_data = get_market_data_instance([s.lower() for s in self.symbols])
+                instance_time = time.time() - instance_start
+                logger.info(f"VN.PY market data instance initialized in {instance_time:.2f}s")
                 
                 # Subscribe to ticker updates for each symbol
+                logger.info("Subscribing to market data symbols...")
+                subscribe_start = time.time()
                 for symbol in self.symbols:
                     self.market_data.subscribe(
                         callback=lambda data, s=symbol: self._on_market_data(s, data),
                         symbol=symbol.lower()
                     )
+                subscribe_time = time.time() - subscribe_start
+                logger.info(f"Symbol subscriptions completed in {subscribe_time:.2f}s")
                 
+                logger.info("Starting VN.PY market data feed...")
+                start_start = time.time()
                 self.market_data.start()
+                start_time_taken = time.time() - start_start
+                logger.info(f"VN.PY market data feed started in {start_time_taken:.2f}s")
+                
                 self.connected = True
                 logger.info("Connected to VN.PY market data feed")
             else:
@@ -79,6 +112,8 @@ class VNPyDataBridge:
                 self._start_mock_data()
                 self.connected = True
             
+            total_time = time.time() - start_time
+            logger.info(f"VNPyDataBridge connection completed in {total_time:.2f}s")
             return True
             
         except Exception as e:
@@ -93,14 +128,13 @@ class VNPyDataBridge:
         if self.market_data:
             try:
                 self.market_data.stop()
-            except:
+            except Exception:
                 pass
         logger.info("Disconnected from market data feed")
     
     def _on_market_data(self, symbol: str, data: Dict[str, Any]):
         """Callback for VN.PY market data updates."""
         try:
-            import random
             symbol = symbol.upper()
             
             price = data.get('price', 0)
@@ -154,7 +188,7 @@ class VNPyDataBridge:
                         "volume": data.get('volume', 0),
                         "timestamp": time.time()
                     })
-                except:
+                except Exception:
                     pass
                         
         except Exception as e:
@@ -164,6 +198,15 @@ class VNPyDataBridge:
         """Fetch real prices from Binance public API for realistic data."""
         import urllib.request
         import json
+
+        # Initialize with dummy data immediately for fast startup
+        for symbol in self.symbols:
+            dummy_data = self._get_default_data(symbol)
+            with self._lock:
+                if symbol in self.data_buffer:
+                    self.data_buffer[symbol].append(dummy_data)
+                self.latest_data[symbol] = dummy_data
+            logger.debug(f"Initialized {symbol} with dummy data")
 
         def fetch_binance_prices():
             """Get current prices from Binance public API."""
@@ -237,7 +280,6 @@ class VNPyDataBridge:
 
                 time.sleep(self.update_interval)
 
-        import random
         thread = threading.Thread(target=real_data_loop, daemon=True)
         thread.start()
         logger.info("Started real-time Binance market data feed (public API)")
